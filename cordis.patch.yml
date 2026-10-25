@@ -7,3 +7,19 @@
 - insert:
     - id: dsh-mobile-pwa
       name: dsh-mobile-pwa
+
+# DSH 0.2 authenticates a browser with a signed session cookie that is bound to
+# the request's Host authority, and its Host/Origin fence compares that Host
+# against the accepted authorities. The gateway forwards the browser-facing Host
+# unchanged (that is the documented proxy contract), so the public authority the
+# gateway serves has to be trusted.
+#
+# LAN_GATE_TRUSTED_HOSTS is a comma-separated list of authorities, for example
+# "111.170.171.25,app.example". A port-less entry matches any port. The row
+# only restates the upstream `connection` row's single `trustedHosts` key and
+# appends to the invocation's own list, so `--trusted-host` keeps working.
+- id: connection
+  name: '@deepseek-ai/dsh-client-connection'
+  inject: [webStartup]
+  config:
+    trustedHosts: !!js "[...ctx.webStartup.trustedHosts, ...String(process.env.LAN_GATE_TRUSTED_HOSTS || '').split(',').map((entry) => entry.trim()).filter(Boolean)]"

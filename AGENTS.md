@@ -67,8 +67,18 @@ into the served HTML.
    report "the agent finished" for the other subscribers.
 8. **Push must be encrypted**: a push service rejects a plain-text body. Use
    `lib/web-push.cjs` (`encryptPayload` + `buildVapidAuthorization`), never plain JSON.
-9. **Port fallback**: on `EADDRINUSE`, server increments the port (up to +20).
-10. **Injection quoting**: the HTML-injected inline CSS/JS strings in
+9. **Forward the browser-facing Host**: DSH 0.2's Host/Origin fence compares the
+   received Host against the accepted authorities, and the browser session cookie
+   is bound to that authority. The gateway therefore forwards Host unchanged
+   (override with `LAN_GATE_REWRITE_HOST=1`). The public authority must be
+   trusted: `LAN_GATE_TRUSTED_HOSTS` or `--trusted-host`.
+10. **Browser session bootstrap**: DSH only signs a session cookie for a request
+    carrying the process launch token. The plugin reads that token from
+    `ctx.connection.authenticatedUrl()` and passes it to the gateway, which
+    exchanges it for the browser's cookie. Never print or require the tokenized
+    launch URL.
+11. **Port fallback**: on `EADDRINUSE`, server increments the port (up to +20).
+12. **Injection quoting**: the HTML-injected inline CSS/JS strings in
     `lib/lan-gate-server.cjs` are JS string literals — keep quote usage consistent
     (historical bug: double quotes inside double quotes broke the injected script).
 

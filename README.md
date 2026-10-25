@@ -84,11 +84,26 @@ dsh plugin --profile web add ./dsh-mobile-pwa
 | `LAN_GATE_TARGET_HOST` | `127.0.0.1` | 本机 DSH Web UI 地址（插件会自动填 `webStartup.host`，此变量优先） |
 | `LAN_GATE_TARGET_PORT` | `3080` | 本机 DSH Web UI 端口（插件会自动填 `webStartup.port`，此变量优先） |
 | `LAN_GATE_RATE_LIMIT` | `120` | 每 IP 每分钟请求上限 |
+| `LAN_GATE_TRUSTED_HOSTS` | 空 | **对外服务地址白名单**，逗号分隔（如 `111.170.171.25,app.example`）。DSH 0.2 的 Host/Origin 栅栏按浏览器看到的 Host 校验，网关原样透传 Host，所以这里必须声明对外地址；不带端口的条目匹配任意端口 |
+| `LAN_GATE_REWRITE_HOST` | 空 | 设为 `1` 时把 Host 改写成回环地址（仅老版本 DSH 需要） |
+| `LAN_GATE_DSH_TOKEN` | 自动 | DSH 进程 launch token，插件从 `ctx.connection` 自动读取并交给网关 |
+| `LAN_GATE_PUBLIC_URL` | 空 | 仅用于生成 token 化 URL 时的基准地址 |
 | `LAN_GATE_VAPID_PUBLICKEY` | 自动生成 | Web Push VAPID 公钥（base64url） |
 | `LAN_GATE_VAPID_PRIVATEKEY` | 自动生成 | Web Push VAPID 私钥（base64url PKCS#8） |
 | `LAN_GATE_VAPID_SUBJECT` | `mailto:dsh-mobile-pwa@localhost` | VAPID 联系方式 |
 
 > VAPID 密钥对未提供时会自动生成一次并保存到 `~/.dsh/lan-gate-vapid.json`（权限 600），重启不失效。
+
+### DSH 0.2 的浏览器鉴权是怎么打通的
+
+DSH 0.2 起，浏览器要拿一个**签名 session cookie** 才能用 Web UI，而这个 cookie 的首次签发需要一个**进程 launch token**（每次重启都会变）。本插件的做法：
+
+1. 插件在 DSH 进程内从 `ctx.connection.authenticatedUrl()` 读出本次启动的 launch token，交给网关子进程；
+2. 网关**原样透传浏览器 Host**（DSH 的 Host/Origin 栅栏与 cookie 的 authority 都基于它），并在浏览器还没有 session cookie 时，用这个 token 去上游换一张 cookie，直接转交给浏览器；
+3. 于是**用户打开的就是一个不带 token 的普通 URL**，不需要复制启动日志里的 tokenized 链接。
+
+前提是 DSH 侧要信任对外地址：把 `LAN_GATE_TRUSTED_HOSTS` 设成对外的 `host` 或 `host:port`（bundle 的 `connection` 行会自动把它并进 `--trusted-host` 列表），或直接在启动参数里加 `--trusted-host <对外地址>`。
+
 
 ### 使用流程
 

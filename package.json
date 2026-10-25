@@ -1,6 +1,6 @@
 {
   "name": "dsh-mobile-pwa",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Complete mobile PWA for DeepSeek Harness (DSH): secure remote-access gateway + install-to-homescreen manifest + offline-capable service worker + touch-first gestures + agent-done notifications + dark compact mobile UI. 移动端 PWA 完整方案 for DeepSeek Harness.",
   "license": "MIT",
   "type": "module",

@@ -68,11 +68,26 @@ dsh plugin --profile web add ./dsh-mobile-pwa
 | `LAN_GATE_TARGET_HOST` | `127.0.0.1` | DSH Web UI host (the plugin fills `webStartup.host`; this wins) |
 | `LAN_GATE_TARGET_PORT` | `3080` | DSH Web UI port (the plugin fills `webStartup.port`; this wins) |
 | `LAN_GATE_RATE_LIMIT` | `120` | Requests per IP per minute |
+| `LAN_GATE_TRUSTED_HOSTS` | – | **Public authorities the gateway serves**, comma separated (`111.170.171.25,app.example`). DSH 0.2's Host/Origin fence compares the browser-facing Host, which the gateway forwards unchanged, so the public authority has to be declared here; a port-less entry matches any port |
+| `LAN_GATE_REWRITE_HOST` | – | Set to `1` to rewrite Host to the loopback address (only needed by older DSH) |
+| `LAN_GATE_DSH_TOKEN` | auto | DSH process launch token; the plugin reads it from `ctx.connection` and hands it to the gateway |
+| `LAN_GATE_PUBLIC_URL` | – | Base URL used when minting the tokenized URL |
 | `LAN_GATE_VAPID_PUBLICKEY` | generated | Web Push VAPID public key (base64url) |
 | `LAN_GATE_VAPID_PRIVATEKEY` | generated | Web Push VAPID private key (base64url PKCS#8) |
 | `LAN_GATE_VAPID_SUBJECT` | `mailto:dsh-mobile-pwa@localhost` | VAPID contact |
 
 > When no VAPID keypair is supplied, one is generated once and stored in `~/.dsh/lan-gate-vapid.json` (mode 600) so subscriptions survive restarts.
+
+### How DSH 0.2 browser authentication is handled
+
+Since DSH 0.2 a browser needs a **signed session cookie**, and the first issue of that cookie needs a **process launch token** that changes on every restart. This plugin removes that step for the user:
+
+1. The plugin reads the launch token from `ctx.connection.authenticatedUrl()` inside the DSH process and hands it to the gateway child.
+2. The gateway forwards the **browser-facing Host unchanged** (DSH's Host/Origin fence and the cookie's authority both depend on it) and, when the browser has no session cookie yet, exchanges the token upstream and passes the cookie straight to the browser.
+3. The user therefore opens a **plain URL** — no tokenized link to copy from the startup log.
+
+DSH must trust the public authority for this to work: set `LAN_GATE_TRUSTED_HOSTS` to the public `host` or `host:port` (the bundle's `connection` row merges it into the `--trusted-host` list), or pass `--trusted-host <public authority>` on the command line.
+
 
 ### Flow
 

@@ -11,3 +11,15 @@
     - id: dsh-mobile-pwa
       name: dsh-mobile-pwa
       path: file:///ABSOLUTE_PATH/dsh-mobile-pwa/lan-gate.mjs
+
+# The public authority the gateway serves must be trusted by DSH's Host/Origin
+# fence, because the gateway forwards the browser-facing Host unchanged.
+# Set LAN_GATE_TRUSTED_HOSTS in the DSH process environment, e.g.
+#   LAN_GATE_TRUSTED_HOSTS=203.0.113.10,app.example
+# and append the same row to the profile patch:
+#
+# - id: connection
+#   name: '@deepseek-ai/dsh-client-connection'
+#   inject: [webStartup]
+#   config:
+#     trustedHosts: !!js "[...ctx.webStartup.trustedHosts, ...String(process.env.LAN_GATE_TRUSTED_HOSTS || '').split(',').map((entry) => entry.trim()).filter(Boolean)]"

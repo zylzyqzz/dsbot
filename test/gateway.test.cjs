@@ -65,7 +65,7 @@ function startGateway(port, targetPort) {
   child.stdout.on('data', (d) => { out += d })
   child.stderr.on('data', (d) => { err += d })
   const ready = new Promise((resolve) => {
-    const t = setInterval(() => { if (out.includes('[lan-gate] gateway starting')) { clearInterval(t); resolve() } }, 40)
+    const t = setInterval(() => { if (out.includes('[lan-gate] listening on')) { clearInterval(t); resolve() } }, 40)
     setTimeout(() => { clearInterval(t); resolve() }, 5000)
   })
   return { child, ready, logs: () => out + err, home }
@@ -271,6 +271,85 @@ test('push: payload encryption round-trips (RFC 8291 aes128gcm, RFC 8188 framing
   const end = plain.indexOf(0x02)
   const decoded = JSON.parse(plain.subarray(0, end).toString('utf8'))
   assert.deepStrictEqual(decoded, payload)
+})
+
+test('gateway: forwards the browser-facing Host unchanged (DSH 0.2 Host fence)', async () => {
+  const seen = []
+  const target = http.createServer((req, res) => {
+    seen.push({ host: req.headers.host, url: req.url })
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end('<!doctype html><html><head></head><body></body></html>')
+  })
+  const targetPort = await freePort()
+  const gatewayPort = await freePort()
+  await new Promise((r) => target.listen(targetPort, '127.0.0.1', r))
+  const gw = startGateway(gatewayPort, targetPort)
+  await gw.ready
+  try {
+    await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: gatewayPort, path: '/', headers: { host: '111.170.171.25:3088' } }, (res) => {
+        res.resume()
+        res.on('end', resolve)
+      })
+      req.on('error', reject)
+      req.end()
+    })
+    assert.strictEqual(seen.length, 1)
+    assert.strictEqual(seen[0].host, '111.170.171.25:3088', 'upstream sees the browser host')
+  } finally {
+    gw.child.kill('SIGTERM')
+    await new Promise((r) => target.close(r))
+  }
+})
+
+test('gateway: mints the DSH browser session cookie with the launch token', async () => {
+  const seen = []
+  const target = http.createServer((req, res) => {
+    seen.push({ host: req.headers.host, url: req.url })
+    if (req.url === '/?token=test-launch-token') {
+      res.writeHead(303, {
+        'set-cookie': 'dsh-auth-abc=session-value; Path=/; HttpOnly; SameSite=Strict',
+        location: './',
+        'cache-control': 'no-store'
+      })
+      res.end()
+      return
+    }
+    res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end('dsh web authentication required\n')
+  })
+  const targetPort = await freePort()
+  const gatewayPort = await freePort()
+  await new Promise((r) => target.listen(targetPort, '127.0.0.1', r))
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-mobile-pwa-test-'))
+  const child = spawn(process.execPath, [GATEWAY], {
+    env: {
+      ...process.env,
+      DSH_HOME: home,
+      LAN_GATE_PORT: String(gatewayPort),
+      LAN_GATE_TARGET_HOST: '127.0.0.1',
+      LAN_GATE_TARGET_PORT: String(targetPort),
+      LAN_GATE_DSH_TOKEN: 'test-launch-token'
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+  let out = ''
+  child.stdout.on('data', (d) => { out += d })
+  await new Promise((resolve) => {
+    const t = setInterval(() => { if (out.includes('[lan-gate] listening on')) { clearInterval(t); resolve() } }, 40)
+    setTimeout(() => { clearInterval(t); resolve() }, 5000)
+  })
+  try {
+    const page = await get(gatewayPort, '/')
+    assert.strictEqual(page.status, 303, 'gateway relays the session redirect')
+    assert.ok(page.headers['set-cookie'], 'gateway relays the DSH session cookie')
+    assert.ok(page.headers['set-cookie'][0].startsWith('dsh-auth-'), 'cookie is the DSH session cookie')
+    assert.strictEqual(seen[0].url, '/?token=test-launch-token', 'gateway used the launch token')
+    assert.strictEqual(seen[0].host, '127.0.0.1:' + gatewayPort, 'cookie is minted for the browser authority')
+  } finally {
+    child.kill('SIGTERM')
+    await new Promise((r) => target.close(r))
+  }
 })
 
 test('push: VAPID authorization header is a well-formed ES256 JWT', async () => {

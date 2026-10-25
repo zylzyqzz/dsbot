@@ -13,6 +13,10 @@
 //     DSH_* facts), so every setting the gateway needs is passed explicitly.
 //   * The bound host/port come from the `webStartup` service instead of being
 //     hardcoded, so `dsh web --port 0` or `--host <addr>` still works.
+//   * DSH 0.2 authenticates browsers with a launch token that is exchanged for a
+//     signed session cookie. The plugin reads that token from the Connection
+//     service and hands it to the gateway, which mints the cookie on the
+//     browser's behalf: the user opens a plain URL, never a tokenized one.
 //
 // Mount via cordis.patch.yml (see cordis.patch.yml.example) or `dsh plugin add`.
 import { fileURLToPath } from 'node:url'
@@ -26,6 +30,7 @@ const serverFile = join(here, 'lib', 'lan-gate-server.cjs')
 
 const DEFAULT_TARGET_HOST = '127.0.0.1'
 const DEFAULT_TARGET_PORT = 3080
+const RESOLVE_TIMEOUT_MS = 20000
 
 function envInt(name) {
   const raw = process.env[name]
@@ -35,41 +40,85 @@ function envInt(name) {
 }
 
 /**
+ * Wait for a host service to mount, without failing when it never does.
+ * @param ctx - plugin context
+ * @param service - service key, e.g. "webStartup" or "connection"
+ * @param timeoutMs - how long to wait before giving up
+ * @returns the service value, or undefined on timeout
+ */
+function waitForService(ctx, service, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(value)
+    }
+    const timer = setTimeout(() => finish(undefined), timeoutMs)
+    try {
+      ctx.inject([service], (serviceCtx) => {
+        let value
+        try { value = serviceCtx.get(service) } catch (e) { value = undefined }
+        finish(value)
+      })
+    } catch (e) {
+      finish(undefined)
+    }
+  })
+}
+
+/**
  * Resolve the DSH Web UI address the gateway must proxy to.
  *
  * Preference order: explicit env override, then the live `webStartup` service
  * (authoritative for `dsh web --host/--port`), then the documented defaults.
- * The service may mount after this plugin does, so it is polled for a while.
  */
 async function resolveTarget(ctx) {
   const envHost = process.env.LAN_GATE_TARGET_HOST
   const envPort = envInt('LAN_GATE_TARGET_PORT')
-  const deadline = Date.now() + 20000
-
-  for (;;) {
-    const startup = ctx.get('webStartup')
-    if (startup && (startup.port !== undefined || startup.host !== undefined)) {
-      const host = envHost || startup.host || DEFAULT_TARGET_HOST
-      const port = envPort || startup.port || DEFAULT_TARGET_PORT
-      return { host, port, source: 'webStartup' }
-    }
-    if (envHost && envPort) return { host: envHost, port: envPort, source: 'env' }
-    if (Date.now() > deadline) break
-    await new Promise((resolve) => setTimeout(resolve, 500))
+  const startup = await waitForService(ctx, 'webStartup', RESOLVE_TIMEOUT_MS)
+  if (startup && (startup.port !== undefined || startup.host !== undefined)) {
+    const host = envHost || startup.host || DEFAULT_TARGET_HOST
+    const port = envPort || startup.port || DEFAULT_TARGET_PORT
+    return { host, port, source: 'webStartup' }
   }
-
   const host = envHost || DEFAULT_TARGET_HOST
   const port = envPort || DEFAULT_TARGET_PORT
   return { host, port, source: envHost || envPort ? 'env' : 'default' }
 }
 
+/**
+ * Read DSH's process launch token from the Connection service.
+ *
+ * DSH mints a browser session cookie only for a request carrying this token;
+ * the gateway uses it to obtain that cookie for the browser, so the launch URL
+ * never has to be shared.
+ *
+ * @returns the launch token, or an empty string when unavailable
+ */
+async function resolveLaunchToken(ctx) {
+  const connection = await waitForService(ctx, 'connection', RESOLVE_TIMEOUT_MS)
+  if (!connection || typeof connection.authenticatedUrl !== 'function') return ''
+  try {
+    const base = process.env.LAN_GATE_PUBLIC_URL || 'http://127.0.0.1/'
+    const url = new URL(connection.authenticatedUrl(base))
+    return url.searchParams.get('token') || ''
+  } catch (e) {
+    return ''
+  }
+}
+
 export function apply(ctx) {
   let handle = null
-  let disposed = false
+  let reportTimer = null
 
   const start = async () => {
     try {
-      const target = await resolveTarget(ctx)
+      const [target, token] = await Promise.all([
+        resolveTarget(ctx),
+        resolveLaunchToken(ctx)
+      ])
       const nodePath = await ctx.subprocess.resolveExecutable('node')
 
       // DSH 0.2 scrubs the child environment, so every value the gateway reads
@@ -78,10 +127,12 @@ export function apply(ctx) {
         LAN_GATE_TARGET_HOST: target.host,
         LAN_GATE_TARGET_PORT: String(target.port)
       }
+      if (token) env.LAN_GATE_DSH_TOKEN = token
       for (const key of [
         'LAN_GATE_PORT',
         'LAN_GATE_HOST',
         'LAN_GATE_RATE_LIMIT',
+        'LAN_GATE_REWRITE_HOST',
         'LAN_GATE_VAPID_PUBLICKEY',
         'LAN_GATE_VAPID_PRIVATEKEY',
         'LAN_GATE_VAPID_SUBJECT',
@@ -110,7 +161,8 @@ export function apply(ctx) {
       })
 
       console.log(
-        `[dsh-mobile-pwa] gateway starting -> ${target.host}:${target.port} (${target.source})`
+        `[dsh-mobile-pwa] gateway starting -> ${target.host}:${target.port} (${target.source})` +
+        (token ? ' · dsh session bootstrap armed' : ' · dsh session bootstrap unavailable')
       )
 
       const report = () => {
@@ -125,9 +177,7 @@ export function apply(ctx) {
           if (eread && eread.text) console.error(`[dsh-mobile-pwa] stderr: ${eread.text.trim()}`)
         }
       }
-      const schedule = typeof ctx.timeout === 'function'
-        ? ctx.timeout(report, 1500)
-        : (ctx.get('timer') && ctx.get('timer').timeout(report, 1500))
+      reportTimer = setTimeout(report, 1500)
     } catch (err) {
       console.error(`[dsh-mobile-pwa] ${String((err && err.message) || err)}`)
     }
@@ -137,12 +187,10 @@ export function apply(ctx) {
 
   ctx.effect(() => {
     return () => {
-      disposed = true
+      if (reportTimer) { clearTimeout(reportTimer); reportTimer = null }
       if (handle) {
         try { handle.terminate() } catch (e) { /* ignore */ }
       }
     }
   })
-
-  return () => { disposed = true }
 }
