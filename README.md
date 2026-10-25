@@ -84,7 +84,7 @@ dsh plugin --profile web add ./dsh-mobile-pwa
 | `LAN_GATE_TARGET_HOST` | `127.0.0.1` | 本机 DSH Web UI 地址（插件会自动填 `webStartup.host`，此变量优先） |
 | `LAN_GATE_TARGET_PORT` | `3080` | 本机 DSH Web UI 端口（插件会自动填 `webStartup.port`，此变量优先） |
 | `LAN_GATE_RATE_LIMIT` | `120` | 每 IP 每分钟请求上限 |
-| `LAN_GATE_MAX_TOKENS` | `8` | 单个已批准设备最多可绑定几个浏览器（每个浏览器一枚令牌） |
+| `LAN_GATE_MAX_TOKENS` | `8` | 单个已批准设备同时保留几个浏览器令牌（每个浏览器一枚，超出后淘汰最旧的一枚，不会把新浏览器挡在门外） |
 | `LAN_GATE_TRUSTED_HOSTS` | 空 | **对外服务地址白名单**，逗号分隔（如 `111.170.171.25,app.example`）。DSH 0.2 的 Host/Origin 栅栏按浏览器看到的 Host 校验，网关原样透传 Host，所以这里必须声明对外地址；不带端口的条目匹配任意端口 |
 | `LAN_GATE_REWRITE_HOST` | 空 | 设为 `1` 时把 Host 改写成回环地址（仅老版本 DSH 需要） |
 | `LAN_GATE_DSH_TOKEN` | 自动 | DSH 进程 launch token，插件从 `ctx.connection` 自动读取并交给网关 |

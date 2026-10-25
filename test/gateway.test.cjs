@@ -472,16 +472,22 @@ test('auth: a revoked device falls back to the approval wall', () => {
   assert.strictEqual(auth.tokenList(decisions['1.2.3.4']).length, 0, 'revoking drops the tokens')
 })
 
-test('auth: the browser cap per device is enforced', () => {
+test('auth: the browser cap evicts the oldest browser instead of locking the new one out', () => {
   const auth = require('../lib/lan-gate-auth.cjs')
   const decisions = {}
   auth.approveDevice(decisions, '1.2.3.4', 'phone')
+  const old = []
   for (let i = 0; i < auth.MAX_TOKENS_PER_DEVICE; i++) {
-    decisions['1.2.3.4'].tokens.push(auth.randomToken())
+    const t = auth.randomToken()
+    old.push(t)
+    decisions['1.2.3.4'].tokens.push(t)
   }
   const verdict = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined)
-  assert.strictEqual(verdict.action, 'too-many')
-  assert.strictEqual(verdict.count, auth.MAX_TOKENS_PER_DEVICE)
+  assert.strictEqual(verdict.action, 'issue', 'a new browser is never locked out')
+  assert.strictEqual(verdict.tokens.length, auth.MAX_TOKENS_PER_DEVICE, 'the cap still bounds the list')
+  assert.ok(verdict.tokens.includes(verdict.token), 'the new token is stored')
+  assert.ok(!verdict.tokens.includes(old[0]), 'the oldest browser was evicted')
+  assert.ok(verdict.tokens.includes(old[old.length - 1]), 'the newer browsers survive')
 })
 
 test('auth: a state file written by the single-token gateway keeps the signed-in browser', () => {

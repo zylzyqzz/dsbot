@@ -66,7 +66,8 @@ into the served HTML.
 7. **Approval binds an address, a token binds a browser**: never collapse them back into one
    token per address. A phone and a laptop behind the same NAT share one public address, and
    the single-token design locked the second browser out with "需要重新授权". Each browser of
-   an approved device mints its own token (cap: `LAN_GATE_MAX_TOKENS`, default 8).
+   an approved device mints its own token. The count is bounded by `LAN_GATE_MAX_TOKENS`
+   (default 8), but hitting it evicts the **oldest** token — never locks the new browser out.
 8. **Local-only admin**: `/lan-gate/status`, `/lan-gate/action` must reject non-local
    sockets (403). `/pwa/push/send` additionally accepts an approved device, so a phone can
    report "the agent finished" for the other subscribers.
