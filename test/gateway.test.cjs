@@ -40,7 +40,11 @@ function startMockTarget() {
     if (req.url === '/pwa/live') { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('live'); return }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
     // DSH 0.2 shaped markup: the 0.1 "conversation" slot is gone.
-    res.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>DSH Test</title></head>' +
+    res.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>DSH Test</title>' +
+      '<link rel="manifest" href="./manifest.webmanifest" />' +
+      '<meta name="theme-color" content="#ffffff">' +
+      '<link rel="icon" type="image/svg+xml" href="./favicon.svg" />' +
+      '</head>' +
       '<body><div data-slot="main.conversation"><div data-slot="conversation.view">' +
       '<div data-slot="conversation.chat.flow"><div data-slot="conversation.chat.node"></div></div>' +
       '<div data-composer-dock><div data-composer-card><div data-composer-input></div></div></div>' +
@@ -158,6 +162,21 @@ test('gateway: injects manifest link, theme meta & data-lan-device into HTML (lo
     assert.ok(page.body.includes('rel="manifest"'), 'manifest link injected')
     assert.ok(page.body.includes('/pwa/app.css'), 'app.css linked')
     assert.ok(page.body.includes('window.__DSH_PWA__'), 'PWA bootstrap present')
+  })
+})
+
+test('gateway: leaves exactly one manifest link and one theme colour', async () => {
+  await withGateway(async ({ port }) => {
+    const page = await get(port, '/')
+    assert.strictEqual(page.status, 200)
+    const manifests = page.body.match(/<link[^>]*rel="manifest"[^>]*>/gi) || []
+    assert.strictEqual(manifests.length, 1, 'exactly one manifest link')
+    assert.ok(manifests[0].includes('/pwa/manifest.json'), 'the manifest link points at the merged manifest')
+    assert.ok(!page.body.includes('manifest.webmanifest'), "DSH's own manifest link is removed")
+    const themes = page.body.match(/<meta[^>]*name="theme-color"[^>]*>/gi) || []
+    assert.strictEqual(themes.length, 1, 'exactly one theme colour')
+    // The brand favicon must survive the head cleanup.
+    assert.ok(page.body.includes('favicon.svg'), 'the brand favicon link is kept')
   })
 })
 
