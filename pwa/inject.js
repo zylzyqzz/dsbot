@@ -98,6 +98,355 @@
     })
   }
 
+  // =====================================================================
+  // Phone chrome: the left toolbar becomes an overlay drawer, the header
+  // gets a menu button, and a bottom action bar carries the destinations.
+  //
+  // DSH collapses the left column to a 56px icon rail below 1024px, and the
+  // toggle expands it over the squeezed centre: on a 390px phone that leaves
+  // the conversation 110px wide. The gateway takes the column out of the grid
+  // and floats it over the conversation instead, so the rules are:
+  //
+  //   * closed by default, and it takes no space at all
+  //   * it opens as an overlay from the menu button, never by squeezing
+  //   * it closes on a scrim tap, on a selection, on Esc and on the back key
+  //   * above the breakpoint every one of DSH's own rules applies again
+  // =====================================================================
+
+  var DRAWER_BREAKPOINT = 720
+  var drawerMedia = window.matchMedia('(max-width: ' + DRAWER_BREAKPOINT + 'px)')
+  var chromeState = {
+    frame: null,
+    col: null,
+    scrim: null,
+    menu: null,
+    bar: null,
+    observer: null,
+    toggleEl: null,
+    toggleKeys: '',
+    pushed: false,
+    suppressClose: false,
+    ready: false
+  }
+
+  // Hairline icons, 1.6 stroke, 24px box — the Muse register: the glyph
+  // carries the meaning, so the row needs no background, border or pill.
+  var ICON_ATTR = 'viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
+  var ICONS = {
+    menu: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    close: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    // chat: an open speech bubble
+    chat: '<svg ' + ICON_ATTR + '><path d="M20.5 11.6a7.9 7.9 0 0 1-8.1 7.9 8.6 8.6 0 0 1-3.2-.6L4 20.5l1.5-4.4a7.6 7.6 0 0 1-1.1-4A7.9 7.9 0 0 1 12 4.2a7.9 7.9 0 0 1 8.5 7.4z"/></svg>',
+    // compose: a sheet with a plus
+    compose: '<svg ' + ICON_ATTR + '><path d="M13.5 3.5H7a2.5 2.5 0 0 0-2.5 2.5v12A2.5 2.5 0 0 0 7 20.5h10a2.5 2.5 0 0 0 2.5-2.5v-6.5"/><path d="M16.5 3.2a2.1 2.1 0 0 1 3 3L12 13.7l-3.6.9.9-3.6z"/></svg>',
+    // grid: four rounded squares of unequal weight
+    grid: '<svg ' + ICON_ATTR + '><rect x="3.6" y="3.6" width="7" height="7" rx="2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2"/></svg>',
+    // zap: automation
+    zap: '<svg ' + ICON_ATTR + '><path d="M13.5 2.5 4 14h7l-.5 7.5L20 10h-7z"/></svg>',
+    // gear: settings — a ring plus six teeth, not a sunburst
+    gear: '<svg ' + ICON_ATTR + '><circle cx="12" cy="12" r="3.1"/><path d="M19.4 14.2a1.7 1.7 0 0 0 .3 1.9 1.4 1.4 0 1 1-2 2 1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5 1.4 1.4 0 1 1-2.8 0 1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3 1.4 1.4 0 1 1-2-2 1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1.1 1.4 1.4 0 1 1 0-2.8 1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9 1.4 1.4 0 1 1 2-2 1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 11 5.2a1.4 1.4 0 1 1 2.8 0 1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3 1.4 1.4 0 1 1 2 2 1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1.1 1.4 1.4 0 1 1 0 2.8 1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    // doc / idea / check / stack — the Muse tab set, mirrored here
+    doc: '<svg ' + ICON_ATTR + '><path d="M8 3.5h5.5L19 9v9.5a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V9H19"/></svg>',
+    idea: '<svg ' + ICON_ATTR + '><path d="M9 17.5a5.9 5.9 0 1 1 6 0"/><path d="M9.5 17.5h5M10.5 20.5h3"/></svg>',
+    check: '<svg ' + ICON_ATTR + '><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4"/><path d="M8.2 12.2 11 15l4.8-5.4"/></svg>',
+    stack: '<svg ' + ICON_ATTR + '><rect x="3.6" y="3.6" width="7" height="7" rx="2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2"/></svg>'
+  }
+
+  // DSH's own sidebar toggle. In the collapsed rail the button carries the
+  // sidebar.toggle.badge slot, which is a stable hook. The element survives
+  // the expand, so it is cached, and its keyboard shortcut is kept as a
+  // second way back to it.
+  function chromeToggleButton() {
+    if (chromeState.toggleEl && chromeState.toggleEl.isConnected) return chromeState.toggleEl
+    var root = document.querySelector('[data-slot="sidebar"]')
+    if (!root) return null
+    var badge = root.querySelector('[data-slot="sidebar.toggle.badge"]')
+    if (badge) {
+      var btn = badge.closest('button')
+      if (btn) {
+        chromeState.toggleEl = btn
+        if (!chromeState.toggleKeys) chromeState.toggleKeys = btn.getAttribute('aria-keyshortcuts') || ''
+        return btn
+      }
+    }
+    if (chromeState.toggleKeys) {
+      var byKeys = root.querySelector('button[aria-keyshortcuts="' + chromeState.toggleKeys + '"]')
+      if (byKeys) { chromeState.toggleEl = byKeys; return byKeys }
+    }
+    return null
+  }
+
+  // Find a sidebar button by its accessible label. The labels are localised,
+  // so every destination is matched against both languages.
+  function chromeFindButton(matchers) {
+    var root = document.querySelector('[data-slot="sidebar"]')
+    if (!root) return null
+    var buttons = root.querySelectorAll('button')
+    for (var i = 0; i < matchers.length; i++) {
+      for (var j = 0; j < buttons.length; j++) {
+        var label = buttons[j].getAttribute('aria-label') || ''
+        if (matchers[i].test(label)) return buttons[j]
+      }
+    }
+    return null
+  }
+
+  function chromeDrawerOpen() {
+    if (!chromeState.frame) return
+    if (!chromeState.frame.hasAttribute('data-sidebar-collapsed')) return
+    var btn = chromeToggleButton()
+    if (btn) btn.click()
+  }
+
+  function chromeDrawerClose() {
+    if (!chromeState.frame) return
+    if (chromeState.frame.hasAttribute('data-sidebar-collapsed')) return
+    var btn = chromeToggleButton()
+    if (btn) btn.click()
+  }
+
+  // The drawer state is DSH's state: the frame publishes it as
+  // data-sidebar-collapsed. Reading it back keeps the two in step, so the
+  // overlay can never disagree with the column it floats.
+  function chromeSync() {
+    if (!chromeState.frame) return
+    var open = !chromeState.frame.hasAttribute('data-sidebar-collapsed')
+    document.documentElement.setAttribute('data-dsh-lan-drawer-open', open ? '1' : '0')
+    if (open && !chromeState.pushed) {
+      chromeState.pushed = true
+      try { history.pushState({ dshLanDrawer: 1 }, '') } catch (e) { chromeState.pushed = false }
+    } else if (!open && chromeState.pushed) {
+      chromeState.pushed = false
+      try { history.back() } catch (e) { /* ignore */ }
+    }
+  }
+
+  function chromeToBottom() {
+    var flow = document.querySelector('[data-slot="conversation.chat.flow"]')
+    var scroller = flow
+    while (scroller && scroller !== document.body) {
+      if (scroller.scrollHeight > scroller.clientHeight + 40) break
+      scroller = scroller.parentElement
+    }
+    if (scroller) scroller.scrollTop = scroller.scrollHeight
+  }
+
+  // A tap inside the drawer closes it, which is right for "go to that
+  // conversation" and wrong for "open this panel": the panel would be shut
+  // together with the drawer, and the control would look dead. Destinations
+  // that open a panel exempt their own click for one turn.
+  function chromeExemptClose() {
+    chromeState.suppressClose = true
+    setTimeout(function () { chromeState.suppressClose = false }, 0)
+  }
+
+  function chromeRun(matchers) {
+    var btn = chromeFindButton(matchers)
+    if (!btn) { chromeDrawerOpen(); return false }
+    chromeExemptClose()
+    try { btn.click() } catch (e) { /* ignore */ }
+    return true
+  }
+
+  // Find a labelled entry inside any open popover menu.
+  function chromeMenuEntry(matchers) {
+    var menus = document.querySelectorAll('[role="menu"]')
+    for (var i = 0; i < menus.length; i++) {
+      var items = menus[i].querySelectorAll('[role="menuitem"], [role="menuitemradio"], button')
+      for (var j = 0; j < items.length; j++) {
+        var text = (items[j].textContent || '').trim()
+        for (var k = 0; k < matchers.length; k++) if (matchers[k].test(text)) return items[j]
+      }
+    }
+    return null
+  }
+
+  // The drawer's one control is the settings gear: DSH's account launcher,
+  // restyled. Its own click handler opens the account menu and the capture
+  // listener wired in chromeSetup takes the menu's settings entry, so this
+  // only has to make sure the gear is on screen before it is pressed.
+  function chromeOpenSettings() {
+    var launcher = document.querySelector('[data-slot="settings.launcher"] button')
+    if (!launcher) return false
+    chromeExemptClose()
+    if (chromeState.frame && !chromeState.frame.hasAttribute('data-sidebar-collapsed')) {
+      try { launcher.click() } catch (e) { return false }
+      return true
+    }
+    var toggle = chromeToggleButton()
+    if (!toggle) return false
+    toggle.click()
+    setTimeout(function () {
+      chromeExemptClose()
+      try { launcher.click() } catch (e) { /* ignore */ }
+    }, 300)
+    return true
+  }
+
+  function chromePickSettings() {
+    // The entry is labelled "Bot 设置" (the account menu carries 用量 /
+    // 连接器 / 自动化任务 / Bot 设置), so the match has to be wider than
+    // "设置" alone.
+    var entry = chromeMenuEntry([/Bot\s*设置/, /^设置$/, /Bot\s*Settings/i, /^Settings$/i])
+    if (!entry) return false
+    chromeExemptClose()
+    try { entry.click() } catch (e) { return false }
+    return true
+  }
+
+  // The bottom row is the Muse navigation: five hairline glyphs, no labels, no
+  // background, sitting under the composer. Each one is a destination that
+  // already exists in DSH, so the row is a shortcut, not a new surface.
+  function chromeBuildBar() {
+    var bar = document.createElement('nav')
+    bar.className = 'dsh-lan-bar'
+    bar.setAttribute('aria-label', '主导航')
+    var items = [
+      { icon: 'chat', label: '对话', run: function () {
+        chromeDrawerClose()
+        chromeToBottom()
+      } },
+      { icon: 'compose', label: '新建', run: function () {
+        chromeRun([/^新建会话$/, /^New session$/i, /^新会话$/])
+        setTimeout(chromeDrawerClose, 260)
+      } },
+      { icon: 'grid', label: '插件', run: function () { chromeRun([/^插件$/, /^Plugins?$/i]) } },
+      { icon: 'zap', label: '自动化', run: function () { chromeRun([/自动化/, /Automation/i, /Schedule/i]) } },
+      { icon: 'gear', label: '设置', run: function () {
+        if (chromeOpenSettings()) return
+        chromeDrawerOpen()
+      } }
+    ]
+    items.forEach(function (item) {
+      var button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'dsh-lan-bar-item'
+      button.setAttribute('aria-label', item.label)
+      button.innerHTML = ICONS[item.icon] + '<span>' + item.label + '</span>'
+      button.addEventListener('click', item.run)
+      bar.appendChild(button)
+    })
+    return bar
+  }
+
+  function chromeEnsureElements() {
+    if (!chromeState.scrim) {
+      var scrim = document.createElement('div')
+      scrim.className = 'dsh-lan-scrim'
+      scrim.setAttribute('aria-hidden', 'true')
+      scrim.addEventListener('click', function () { chromeDrawerClose() })
+      document.body.appendChild(scrim)
+      chromeState.scrim = scrim
+    }
+    if (!chromeState.menu) {
+      var menu = document.createElement('button')
+      menu.type = 'button'
+      menu.className = 'dsh-lan-menu'
+      menu.setAttribute('aria-label', '菜单')
+      menu.innerHTML = '<span class="ico-menu">' + ICONS.menu + '</span><span class="ico-close">' + ICONS.close + '</span>'
+      menu.addEventListener('click', function () {
+        if (chromeState.frame && chromeState.frame.hasAttribute('data-sidebar-collapsed')) chromeDrawerOpen()
+        else chromeDrawerClose()
+      })
+      document.body.appendChild(menu)
+      chromeState.menu = menu
+    }
+    if (!chromeState.bar) {
+      chromeState.bar = chromeBuildBar()
+    }
+    // No footer row: every destination already lives in the settings pages,
+    // so the drawer carries one control (the gear) and no duplicate doors.
+  }
+
+  function chromeTeardown() {
+    var html = document.documentElement
+    html.removeAttribute('data-dsh-lan-drawer')
+    html.removeAttribute('data-dsh-lan-drawer-open')
+    if (chromeState.frame) {
+      chromeState.frame.classList.remove('dsh-lan-frame')
+      chromeState.col.classList.remove('dsh-lan-sidebar-col')
+    }
+    if (chromeState.observer) { chromeState.observer.disconnect(); chromeState.observer = null }
+    chromeState.ready = false
+    chromeState.frame = null
+    chromeState.col = null
+    chromeState.toggleEl = null
+    if (chromeState.pushed) {
+      chromeState.pushed = false
+      try { history.back() } catch (e) { /* ignore */ }
+    }
+  }
+
+  function chromeSetup() {
+    if (!drawerMedia.matches) {
+      if (chromeState.ready) chromeTeardown()
+      return
+    }
+    if (chromeState.ready && chromeState.frame && chromeState.frame.isConnected) return
+    var root = document.querySelector('[data-slot="sidebar"]')
+    if (!root) return
+    var col = root.parentElement
+    var frame = col ? col.parentElement : null
+    if (!col || !frame) return
+    chromeState.frame = frame
+    chromeState.col = col
+    frame.classList.add('dsh-lan-frame')
+    col.classList.add('dsh-lan-sidebar-col')
+    document.documentElement.setAttribute('data-dsh-lan-drawer', 'on')
+    chromeState.ready = true
+    chromeEnsureElements()
+    if (chromeState.observer) chromeState.observer.disconnect()
+    chromeState.observer = new MutationObserver(function () { chromeSync() })
+    chromeState.observer.observe(frame, { attributes: true, attributeFilter: ['data-sidebar-collapsed'] })
+    // A selection inside the column means "go there", so the drawer steps
+    // aside. The toggle itself is the only control that stays.
+    if (!col.getAttribute('data-dsh-lan-wired')) {
+      col.setAttribute('data-dsh-lan-wired', '1')
+      col.addEventListener('click', function (event) {
+        if (chromeState.suppressClose) return
+        var target = event.target
+        if (!target || !target.closest) return
+        // The gear opens a popover, and a tap on it is not a destination.
+        var gear = document.querySelector('[data-slot="settings.launcher"] button')
+        if (gear && (target === gear || gear.contains(target))) return
+        var toggle = chromeToggleButton()
+        if (toggle && (target === toggle || toggle.contains(target))) return
+        chromeDrawerClose()
+      })
+    }
+    // Tapping the gear opens DSH's account menu; the gear is the settings
+    // door, so the menu's own settings entry is taken straight away. Bound
+    // once on the element, in the capture phase, so DSH's handler still runs.
+    var launcherBtn = document.querySelector('[data-slot="settings.launcher"] button')
+    if (launcherBtn && !launcherBtn.getAttribute('data-lan-gear')) {
+      launcherBtn.setAttribute('data-lan-gear', '1')
+      launcherBtn.addEventListener('click', function () {
+        setTimeout(chromePickSettings, 120)
+      }, true)
+    }
+    chromeSync()
+  }
+
+  function chromeOnBreakpoint() {
+    if (drawerMedia.matches) chromeSetup()
+    else chromeTeardown()
+  }
+
+  if (drawerMedia.addEventListener) drawerMedia.addEventListener('change', chromeOnBreakpoint)
+  else if (drawerMedia.addListener) drawerMedia.addListener(chromeOnBreakpoint)
+
+  // The phone's back key closes the drawer instead of leaving the page.
+  window.addEventListener('popstate', function () {
+    if (!chromeState.pushed) return
+    chromeState.pushed = false
+    chromeDrawerClose()
+  })
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && chromeState.ready) chromeDrawerClose()
+  })
+
   // ---- Agent-done detection ---------------------------------------------
   // DSH renders [data-chat-running] while the agent works. When it disappears
   // the turn is over: raise a local notification and tell the gateway, so any
@@ -150,7 +499,12 @@
   }
 
   if (typeof MutationObserver === 'function') {
-    var observer = new MutationObserver(function () { checkRunningState() })
+    var observer = new MutationObserver(function () {
+      checkRunningState()
+      // The sidebar only exists once the app has rendered; wire the drawer
+      // to it as soon as it shows up.
+      chromeSetup()
+    })
     var startObserving = function () {
       if (document.body) {
         observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-chat-running', 'data-streaming'] })

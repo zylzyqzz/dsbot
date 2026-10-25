@@ -158,6 +158,353 @@ html[data-lan-device="phone"] [data-slot="sidebar"] button {
 }
 
 /* =====================================================================
+ * Phone chrome
+ *
+ * The left toolbar becomes an overlay drawer on a narrow viewport. DSH
+ * collapses that column to a 56px icon rail below 1024px and expands it
+ * over the squeezed centre; on a 390px phone that leaves the conversation
+ * 110px wide. The gateway takes the column out of the grid instead and
+ * floats it over the conversation.
+ *
+ * The rules, in one place:
+ *   * closed by default, and it takes no space at all
+ *   * it opens as an overlay from the menu button, never by squeezing
+ *   * it closes on a scrim tap, on a selection, on Esc and on the back key
+ *   * above the breakpoint every one of DSH's own rules applies again
+ *
+ * The scope attribute (data-dsh-lan-drawer) is set by pwa/inject.js from the
+ * live viewport width, so this never depends on the device label.
+ * ===================================================================== */
+
+/* The column leaves the grid: the conversation takes the whole width. The
+   column itself stays a grid item — taking it out of the flow would shift
+   every other column up one track.
+
+   Motion: everything here is a compositor property (transform, opacity) on a
+   promoted layer, with one shared easing curve. No `backdrop-filter` and no
+   animated `box-shadow`: both repaint every frame on a phone GPU, and a drawer
+   that repaints is a drawer that stutters. */
+html[data-dsh-lan-drawer="on"] {
+  --lan-ease: cubic-bezier(.32, .72, 0, 1);
+  --lan-dur: 320ms;
+  --lan-fast: 140ms;
+  --lan-press: .955;
+}
+
+/* Every control in the app answers a touch the same way: a small, fast
+   scale on a promoted layer. Doing it with one rule rather than per-class
+   overrides means DSH's own buttons pick it up too — the composer tools, the
+   message actions, the model chip, the tab strip — instead of only the ones
+   this gateway adds.
+
+   `transform` is already a compositor property, so the press costs no layout
+   or paint; the 140ms curve is short enough to read as instant and long
+   enough to feel soft. Buttons that are disabled or carry their own
+   transform are left alone. */
+html[data-dsh-lan-drawer="on"] button,
+html[data-dsh-lan-drawer="on"] [role="button"],
+html[data-dsh-lan-drawer="on"] [role="menuitem"],
+html[data-dsh-lan-drawer="on"] [role="menuitemradio"],
+html[data-dsh-lan-drawer="on"] [role="tab"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform var(--lan-fast) var(--lan-ease),
+              opacity var(--lan-fast) linear,
+              background-color var(--lan-fast) linear,
+              color var(--lan-fast) linear;
+}
+
+html[data-dsh-lan-drawer="on"] button:not(:disabled):active,
+html[data-dsh-lan-drawer="on"] [role="button"]:not([aria-disabled="true"]):active,
+html[data-dsh-lan-drawer="on"] [role="menuitem"]:active,
+html[data-dsh-lan-drawer="on"] [role="menuitemradio"]:active,
+html[data-dsh-lan-drawer="on"] [role="tab"]:active {
+  transform: scale(var(--lan-press));
+}
+
+/* Full-width rows and list items read better with a tint than with a scale:
+   shrinking a 340px row looks like a glitch, so they get the light wash and
+   keep a hair of movement. */
+html[data-dsh-lan-drawer="on"] .bt-settings-item:active,
+html[data-dsh-lan-drawer="on"] .bt-menu button:active,
+html[data-dsh-lan-drawer="on"] .bt-row:active {
+  transform: scale(.985);
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 6%, transparent);
+}
+
+/* The drawer's own row presses a little harder: it is the primary surface. */
+html[data-dsh-lan-drawer="on"] .dsh-lan-bar-item:active {
+  transform: scale(.9);
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-frame {
+  grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-sidebar-col {
+  --dsh-lan-drawer-w: min(300px, 84vw);
+  position: relative;
+  z-index: 40;
+  width: var(--dsh-lan-drawer-w) !important;
+  margin-left: calc(-1 * var(--dsh-lan-drawer-w));
+  transform: translate3d(0, 0, 0);
+  transition: transform var(--lan-dur) var(--lan-ease);
+  will-change: transform;
+  /* No shadow while parked: the drawer sits just off the left edge, and a
+     shadow drawn there still bleeds onto the screen as a seam. It is turned
+     on only while the drawer is actually open. */
+  box-shadow: none;
+  padding-top: 52px;
+  border-right: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .22));
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+html[data-dsh-lan-drawer="on"][data-dsh-lan-drawer-open="1"] .dsh-lan-sidebar-col {
+  transform: translate3d(var(--dsh-lan-drawer-w), 0, 0);
+  box-shadow: 18px 0 40px rgba(0, 0, 0, .28);
+}
+
+/* The drawer keeps the expanded column's own width, whatever it is. */
+html[data-dsh-lan-drawer="on"] .dsh-lan-sidebar-col [data-slot="sidebar"],
+html[data-dsh-lan-drawer="on"] .dsh-lan-sidebar-col [data-slot="sidebar"] > * {
+  width: 100% !important;
+}
+
+/* The resize handle belongs to the desktop column, not to the drawer. */
+html[data-dsh-lan-drawer="on"] .dsh-lan-frame [data-side="sidebar"] {
+  display: none !important;
+}
+
+/* The scrim: taps outside the drawer close it. Opacity only, and it fades a
+   touch faster than the drawer travels so the two land together. */
+html[data-dsh-lan-drawer="on"] .dsh-lan-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 38;
+  background: rgba(10, 12, 16, .38);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+  transition: opacity 240ms var(--lan-ease);
+}
+
+html[data-dsh-lan-drawer="on"][data-dsh-lan-drawer-open="1"] .dsh-lan-scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The menu button: top-left of the app bar, always reachable. It turns
+   into the close button while the drawer is open. Borderless and opaque, so
+   it costs nothing to composite while the page scrolls under it. */
+html[data-dsh-lan-drawer="on"] .dsh-lan-menu {
+  position: fixed;
+  top: max(env(safe-area-inset-top), 6px);
+  left: max(env(safe-area-inset-left), 6px);
+  z-index: 42;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dsw-alias-text-primary, inherit);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--lan-fast, 140ms) var(--lan-ease, ease-out),
+              background-color var(--lan-fast, 140ms) linear;
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-menu:active {
+  transform: scale(.9);
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 8%, transparent);
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-menu .ico-close { display: none; }
+html[data-dsh-lan-drawer="on"][data-dsh-lan-drawer-open="1"] .dsh-lan-menu .ico-menu { display: none; }
+html[data-dsh-lan-drawer="on"][data-dsh-lan-drawer-open="1"] .dsh-lan-menu .ico-close { display: block; }
+
+/* The app bar: the header keeps the menu button's room and becomes a real
+   app bar row. DSH floats it with an `!important` absolute rule, so this
+   needs `!important` too: relative puts it back into the flow, the
+   conversation starts below it, and it stays put while the body scrolls.
+
+   Opaque, not translucently blurred: a `backdrop-filter` here re-samples the
+   scrolling conversation on every frame, which is exactly the stutter this
+   build is trying to avoid. */
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.header"] > header {
+  position: relative !important;
+  z-index: 8 !important;
+  min-height: 52px;
+  padding: 8px 10px 8px 52px !important;
+  background: var(--dsw-alias-bg-base, #fff) !important;
+  border-bottom: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .12));
+}
+
+/* The session name sits in the middle, like an app bar. */
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.session.header"] > div > div:first-child {
+  justify-content: center !important;
+}
+
+/* The bot's own name chip is a bordered pill in the app, but an app bar keeps
+   a plain title: the mark and the name stay, the capsule goes. */
+html[data-dsh-lan-drawer="on"] .bt-head .bt-pill {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  padding: 4px 8px !important;
+  gap: 8px !important;
+}
+html[data-dsh-lan-drawer="on"] .bt-head .bt-pill:active {
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 6%, transparent) !important;
+}
+
+/* =====================================================================
+ * Settings screen on a phone.
+ *
+ * The dialog is a two-column layout (198px page list + page body). Its own
+ * phone rule turns the list into a horizontal strip, but that rule loses the
+ * cascade here, and a column list 467px tall leaves the page body a third of
+ * the screen. So the strip is restated at a specificity that wins, and the
+ * body takes the rest of the height.
+ * ===================================================================== */
+@media (max-width: 720px) {
+  [role="dialog"][aria-modal="true"] .bt-settings {
+    flex-direction: column !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-settings-nav {
+    width: 100% !important;
+    flex: none !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 2px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 6px 8px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--bt-line, rgba(128, 128, 128, .2)) !important;
+    /* A transparent right border keeps the last tab clear of the close
+       button: padding is not honoured inside a scrolling flex row. */
+    border-right: 48px solid transparent !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  [role="dialog"][aria-modal="true"] .bt-settings-nav::-webkit-scrollbar { display: none; }
+
+  /* The sliding pill belongs to the desktop column. */
+  [role="dialog"][aria-modal="true"] .bt-settings-nav .bt-thumb { display: none !important; }
+
+  [role="dialog"][aria-modal="true"] .bt-settings-item {
+    flex: none !important;
+    white-space: nowrap !important;
+    min-height: 40px !important;
+    padding: 0 14px !important;
+    border-radius: 10px !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-settings-main {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-settings-head {
+    padding-left: 16px !important;
+    padding-right: 56px !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-settings-close {
+    width: 44px !important;
+    height: 44px !important;
+    top: 2px !important;
+    right: 2px !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-set-section {
+    max-width: 100% !important;
+  }
+}
+
+/* =====================================================================
+ * Drawer footer: one control.
+ *
+ * Every destination (options, connectors, automations, usage, keys, about)
+ * already lives inside the settings pages, so a second row of five icons only
+ * gave each of them two doors. The drawer keeps a single gear, bottom-left,
+ * and that gear lands straight on the settings page.
+ * ===================================================================== */
+html[data-dsh-lan-drawer="on"] .dsh-lan-sidebar-col {
+  padding-bottom: calc(60px + max(env(safe-area-inset-bottom), 0px));
+}
+
+/* "连接插件" duplicates the settings menu's connector page, and it is the row
+   that made the drawer footer look like a second toolbar. Slots render as
+   display:contents wrappers, so the rule has to reach the child. */
+html[data-dsh-lan-drawer="on"] [data-slot="sidebar.footer.action"],
+html[data-dsh-lan-drawer="on"] [data-slot="sidebar.footer.action"] > * {
+  display: none !important;
+}
+
+/* The account launcher becomes the gear: same element, same handler, a
+   different face. Its avatar art is swapped for a hairline gear drawn with a
+   mask, so it takes the theme ink and stays crisp at any density.
+
+   The slot wrapper itself is `display: contents`, so it has no box to
+   position: the absolute placement has to go on the button. */
+html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button {
+  position: absolute;
+  left: 10px;
+  bottom: calc(10px + max(env(safe-area-inset-bottom), 0px));
+  z-index: 6;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: var(--dsw-alias-text-secondary, #6b7280) !important;
+}
+
+html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button > * {
+  display: none !important;
+}
+
+html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button::before {
+  content: '';
+  width: 24px;
+  height: 24px;
+  background-color: currentColor;
+  -webkit-mask: var(--lan-gear) center / 24px 24px no-repeat;
+  mask: var(--lan-gear) center / 24px 24px no-repeat;
+}
+
+html[data-dsh-lan-drawer="on"] {
+  --lan-gear: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3.1'/%3E%3Cpath d='M19.4 14.2a1.7 1.7 0 0 0 .3 1.9 1.4 1.4 0 1 1-2 2 1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5 1.4 1.4 0 1 1-2.8 0 1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3 1.4 1.4 0 1 1-2-2 1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1.1 1.4 1.4 0 1 1 0-2.8 1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9 1.4 1.4 0 1 1 2-2 1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 11 5.2a1.4 1.4 0 1 1 2.8 0 1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3 1.4 1.4 0 1 1 2 2 1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1.1 1.4 1.4 0 1 1 0 2.8 1.7 1.7 0 0 0-1.5 1z'/%3E%3C/svg%3E");
+}
+
+/* "Switch to the classic Agent mode" is desktop-only: this build is the Bot
+   surface, and the entry only leads away from it. */
+html[data-dsh-lan-drawer="on"] .bt-account-menu > button:last-of-type {
+  display: none !important;
+}
+
+/* =====================================================================
  * Narrow-viewport fallback: when the DSH server itself emits the
  * responsive page (no gateway), apply the same rules to any narrow
  * viewport that is NOT explicitly labelled desktop.
@@ -188,10 +535,8 @@ html[data-lan-device="phone"] [data-slot="sidebar"] button {
     display: flex; flex-direction: column; width: 100vw; height: 100dvh;
     max-width: 100vw; max-height: 100dvh; border-radius: 0;
   }
-  html:not([data-lan-device="desktop"]) [role="dialog"][aria-modal="true"] nav {
-    width: 100%; flex: none; flex-direction: column; gap: 6px; padding: 10px 12px 6px;
-  }
-  html:not([data-lan-device="desktop"]) [role="dialog"][aria-modal="true"] > div:last-child {
-    flex: 1; min-height: 0;
-  }
+  /* The settings screen already ships its own phone layout: a page list that
+     turns into a horizontal strip under 640px. Forcing `nav` to a column here
+     would beat that rule and squeeze the page area to a third of the screen,
+     so the shell is left alone. */
 }
