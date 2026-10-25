@@ -142,8 +142,19 @@ function tokenCookie(res) {
   return hit.split(';')[0]
 }
 
-/** POST an application/x-www-form-urlencoded form, the way a login page does. */
-function postForm(port, urlPath, fields, cookie) {
+/** Same as getWithCookie(), but asks for compressed content like a browser does. */
+function getWithAccept(port, urlPath, acceptEncoding) {
+  return new Promise((resolve, reject) => {
+    const req = http.get({ host: '127.0.0.1', port: port, path: urlPath, headers: { 'accept-encoding': acceptEncoding } }, (res) => {
+      const chunks = []
+      res.on('data', (c) => chunks.push(c))
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }))
+    })
+    req.on('error', reject)
+  })
+}
+
+/** POST an application/x-www-form-urlencoded form, the way a login page does. */function postForm(port, urlPath, fields, cookie) {
   return new Promise((resolve, reject) => {
     const data = new URLSearchParams(fields).toString()
     const headers = {
@@ -639,4 +650,46 @@ test('gateway: the password gate covers the WebSocket relay too', async () => {
     // The gateway answers a non-local upgrade without the password with 403.
     assert.notStrictEqual(status, 101, 'the relay does not open without the password')
   }, { LAN_GATE_PASSWORD: 'test-pass' })
+})
+
+test('gateway: a compressed document is decoded before the markup is injected', async () => {
+  // A browser always asks for compressed content. The upstream then answers
+  // with gzip, and injecting text into those bytes produced a document the
+  // browser could not parse — the blank page that never finished loading.
+  const zlib = require('node:zlib')
+  const target = http.createServer((req, res) => {
+    const html = '<!doctype html><html lang="en"><head><title>DSH gzip</title></head>' +
+      '<body><div id="root"></div></body></html>'
+    if (/\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) {
+      const body = zlib.gzipSync(Buffer.from(html, 'utf8'))
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Encoding': 'gzip',
+        'Content-Length': String(body.length)
+      })
+      res.end(body)
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end(html)
+  })
+  const targetPort = await freePort()
+  const gatewayPort = await freePort()
+  await new Promise((r) => target.listen(targetPort, '127.0.0.1', r))
+  const gw = startGateway(gatewayPort, targetPort)
+  await gw.ready
+  try {
+    const page = await getWithAccept(gatewayPort, '/', 'gzip, deflate, br')
+    assert.strictEqual(page.status, 200)
+    assert.ok(page.body.startsWith('<!doctype html>'), 'the document arrives as readable text')
+    assert.ok(page.body.includes('<div id="root">'), 'the upstream markup survived')
+    assert.ok(page.body.includes('__DSH_PWA__'), 'the PWA bootstrap was injected')
+    assert.strictEqual(page.headers['content-encoding'], undefined,
+      'the response is no longer labelled as compressed')
+    assert.strictEqual(Number(page.headers['content-length']), Buffer.byteLength(page.body),
+      'the content length matches the body that was sent')
+  } finally {
+    gw.child.kill('SIGTERM')
+    await new Promise((r) => target.close(r))
+  }
 })
