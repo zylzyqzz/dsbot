@@ -1,54 +1,57 @@
-# dsh-mobile-pwa · A real PWA for DeepSeek Harness on your phone
+# dsh-mobile-pwa · DeepSeek Harness as a real mobile PWA
 
-> Turn [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) into a **complete mobile PWA**: secure remote access to your own DSH server + install-to-homescreen standalone app + offline capability + touch gestures + agent-done push notifications.
+> Turn [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) into a **complete mobile PWA**: secure remote access to your own DSH, install-to-homescreen, offline capable, touch gestures, agent-done notifications.
 
-Built on the MIT [dsh-mobile-gate](https://github.com/Bernardxu123/dsh-mobile-gate) secure-gateway base, with PWA differentiation.
+Built on the MIT [`dsh-mobile-gate`](https://github.com/Bernardxu123/dsh-mobile-gate) gateway base.
+
+**Current version `0.2.0` — targets DSH `0.2.x`** (`engines.dsh: ">=0.2.0 <0.3.0"`).
+
+[![npm version](https://img.shields.io/npm/v/dsh-mobile-pwa)](https://www.npmjs.com/package/dsh-mobile-pwa)
+[![license](https://img.shields.io/github/license/zylzyqzz/dsh-mobile-pwa)](https://github.com/zylzyqzz/dsh-mobile-pwa/blob/main/LICENSE)
 
 ---
 
 ## Features
 
-| Module | What |
+| Module | What it does |
 | --- | --- |
-| 📡 **Secure remote access** | Isolated child-process gateway. First-visit approval on the host, one-time token per device, per-IP rate limiting. DSH stays `127.0.0.1`-only; the `/api` trust fence is untouched |
-| 📱 **Real PWA** | `manifest.json` + service worker → install to homescreen as a standalone full-screen app with icon, splash, theme-color, maskable assets |
-| 🌐 **Offline** | SW: shell assets cache-first, API network-first with cache fallback, offline fallback page |
-| 👆 **Touch gestures** | Pull-to-refresh, edge-swipe back, pinch-to-resize font (resettable) |
-| 🔔 **Agent-done push** | Web Push when the agent finishes a turn, even when the phone shows another app (opt-in) |
-| 📐 **Touch layout** | 44px targets, safe-area, full-screen dialogs, compact type, horizontal-scrolling code — **desktop never affected** |
-| 🔒 **Desktop unaffected** | Every rule is rooted at `html[data-lan-device="phone"]` or an `@media(max-width:820px)` that excludes `data-lan-device="desktop"` |
+| 📡 **Secure remote access** | Standalone child-process gateway: first-visit approval, one token per browser, per-IP rate limit. The DSH webserver itself stays on loopback, so its `/api` trust fence is untouched. |
+| 📱 **Real PWA** | `manifest.json` + service worker: install-to-homescreen runs it as a standalone app with icon, splash and theme colour. |
+| 🌐 **Offline capable** | Static shell cached first, API network-first, navigation falls back to an offline page. |
+| 👆 **Touch gestures** | Pull-to-refresh, edge-swipe back, pinch font zoom. |
+| 🔔 **Agent-done notifications** | Real Web Push (RFC 8291 aes128gcm body, RFC 8292 VAPID auth). |
+| 📐 **Touch layout** | 44px targets, safe-area insets, full-screen dialogs, compact type, scrollable code — desktop untouched. |
+| 🎯 **0.2 DOM alignment** | The mobile CSS targets the DSH 0.2 slot vocabulary (`main.conversation`, `conversation.view`, `conversation.chat.flow`, `conversation.input.model`, `conversation.composer.dock`, …). Every 0.1-era selector is gone. |
 
 ---
 
 ## Architecture
 
 ```
-Phone ──> gateway (isolated Node child · 0.0.0.0:3088)
-            ├─ not approved       -> "waiting host approval" page (polls /lan-gate/admin)
-            ├─ approved + token   -> reverse proxy to DSH Web UI (127.0.0.1:3080)
-            │        └─ HTML injected: manifest link + PWA bootstrap + touch CSS + randomUUID polyfill
-            ├─ /pwa/*             -> serves manifest / sw.js / app.css / icons / offline.html
-            ├─ /pwa/push/*        -> subscribe & send agent-done notifications
-            └─ over rate          -> 429 page
-Host 127.0.0.1:3088/lan-gate/admin -> approve / deny / revoke devices, pick access mode (phone/desktop/auto)
+phone ──> gateway (standalone Node child process · 0.0.0.0:3088)
+           ├─ unapproved  -> "waiting for approval" page (polls /lan-gate/admin)
+           ├─ approved    -> reverse proxy to the DSH Web UI (local host:port)
+           │      └─ HTML injection: manifest link + PWA bootstrap + touch CSS + randomUUID polyfill
+           ├─ /pwa/*      -> manifest / sw.js / app.css / icons / offline.html
+           ├─ /pwa/push/* -> subscribe / send (real encrypted push)
+           └─ over limit  -> 429 page
+laptop 127.0.0.1:3088/lan-gate/admin -> approve / deny / revoke, pick phone / desktop / auto
 ```
+
+- The gateway is an **isolated child process**: if it dies the harness keeps running, and it is terminated when the plugin unloads.
+- Since **DSH 0.2 rejects a wildcard bind address** (`--host 0.0.0.0` fails at load), the Web UI always listens on one concrete local address. This gateway is the remote door: it owns the exposed port and the approval gate.
+- The target address is **not hardcoded**: the plugin reads the real host/port from the `webStartup` service, so `dsh web --port 0` and `--host <addr>` keep working.
 
 ---
 
-## Quick start (on your own DSH server)
-
-### Option 0 — npm one-liner (recommended, published)
-
-Install straight from npm — prebuilt, **no `allowBuilds` approval needed**:
+## Install
 
 ```bash
-npm add dsh-mobile-pwa     # or: npm install dsh-mobile-pwa@0.1.0
+npm add dsh-mobile-pwa@0.2.0
 dsh plugin --profile web add dsh-mobile-pwa
 ```
 
-Package: https://www.npmjs.com/package/dsh-mobile-pwa
-
-### Option 1 — from GitHub
+From a checkout:
 
 ```bash
 git clone https://github.com/zylzyqzz/dsh-mobile-pwa.git
@@ -56,46 +59,79 @@ cd dsh-mobile-pwa
 dsh plugin --profile web add ./dsh-mobile-pwa
 ```
 
-### Option 2 / 3 — static mount / dynamic plugin
+### Environment variables
 
-Or static-mount via [`cordis.patch.yml.example`](cordis.patch.yml.example).
-Dynamic plugin: see the `lan-gate.mjs` header comments.
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LAN_GATE_PORT` | `3088` | Gateway listen port |
+| `LAN_GATE_HOST` | `0.0.0.0` | Gateway listen address |
+| `LAN_GATE_TARGET_HOST` | `127.0.0.1` | DSH Web UI host (the plugin fills `webStartup.host`; this wins) |
+| `LAN_GATE_TARGET_PORT` | `3080` | DSH Web UI port (the plugin fills `webStartup.port`; this wins) |
+| `LAN_GATE_RATE_LIMIT` | `120` | Requests per IP per minute |
+| `LAN_GATE_VAPID_PUBLICKEY` | generated | Web Push VAPID public key (base64url) |
+| `LAN_GATE_VAPID_PRIVATEKEY` | generated | Web Push VAPID private key (base64url PKCS#8) |
+| `LAN_GATE_VAPID_SUBJECT` | `mailto:dsh-mobile-pwa@localhost` | VAPID contact |
 
-### Env config
-
-`LAN_GATE_PORT` (3088) · `LAN_GATE_HOST` (0.0.0.0) · `LAN_GATE_TARGET_PORT` (3080) · `LAN_GATE_RATE_LIMIT` (120) · `LAN_GATE_VAPID_PUBLICKEY` (empty, for push).
+> When no VAPID keypair is supplied, one is generated once and stored in `~/.dsh/lan-gate-vapid.json` (mode 600) so subscriptions survive restarts.
 
 ### Flow
 
-1. Start DSH + this plugin → sees `[lan-gate] listening on 0.0.0.0:3088 -> 127.0.0.1:3080 (pwa=on)`.
-2. Phone → open `http://<your-ip>:3088` → "waiting approval".
-3. On the host → open `http://127.0.0.1:3088/lan-gate/admin` → approve the device, pick **phone**.
-4. Phone → refresh → DSH UI, PWA-injected.
-5. Browser menu → **Add to Home Screen** → standalone app.
-6. (Optional) enable agent-done notifications from the injected hint.
+1. **Server**: start DSH with the plugin; look for `[lan-gate] listening on 0.0.0.0:3088 -> <host>:<port> (pwa=on)`.
+2. **Phone**: open `http://<server-ip>:3088` → "waiting for approval".
+3. **Laptop**: open `http://127.0.0.1:3088/lan-gate/admin` → approve the device, choose "phone".
+4. **Phone**: pull to refresh → the DSH Web UI, PWA injected.
+5. **Install**: browser menu → "Add to Home Screen".
+6. **Optional**: allow notifications when the page offers it.
 
 ---
 
-## Test locally
+## How agent-done is detected
+
+DSH 0.2 renders `[data-chat-running]` while the agent is working. The injected script watches it with a `MutationObserver`; when it disappears the turn is over, so the page raises a local `Notification` and reports it to the gateway, which pushes it to the other subscribed devices.
+
+> The 0.1-era host plugin `dsh-push.mjs` was removed: it depended on DSH 0.1's `conversation`/`http` services, which no longer exist in 0.2. Browser-side detection is more accurate (DSH's own DOM is the source of truth) and keeps the host process clean.
+
+---
+
+## Local test
 
 ```bash
-npm test   # boots a mock upstream, asserts /pwa assets, HTML injection, status
+npm test
 ```
+
+Boots the real gateway behind a mock upstream and asserts `/pwa` asset serving, HTML injection, status reporting and a full Web Push encrypt/decrypt round-trip.
 
 ---
 
 ## Layout
 
-`lan-gate.mjs` (Cordis entry) · `dsh-push.mjs` (optional push host plugin) · `lib/lan-gate-server.cjs` (zero-dep gateway) · `pwa/` (manifest, sw.js, inject.js, touch-gestures.js, app.css, offline.html, icons) · `cordis.patch.yml(.example)` · `test/`
-
-See [`AGENTS.md`](AGENTS.md) for development conventions (do not break isolation / CSS prefix rules / stable selectors).
+| Path | Role |
+| --- | --- |
+| `lan-gate.mjs` | Cordis entry: resolve the target address, spawn the gateway, own its lifetime |
+| `lib/lan-gate-server.cjs` | The gateway: zero-dependency single file (proxy, approval, tokens, rate limit, PWA injection) |
+| `lib/web-push.cjs` | Real Web Push: VAPID keys + ES256 JWT, ECDH/HKDF derivation, AES-128-GCM body encryption |
+| `pwa/manifest.json` | Install manifest |
+| `pwa/sw.js` | Service worker: caching, push, subscription rotation |
+| `pwa/inject.js` | Page bootstrap: SW registration, gestures, push subscription, agent-done detection |
+| `pwa/touch-gestures.js` | Pull-to-refresh / edge swipe / pinch zoom |
+| `pwa/app.css` | Touch-first mobile CSS |
+| `pwa/offline.html` | Offline fallback |
+| `pwa/icons/` | SVG source + 192/512 PNG + maskable icons |
+| `cordis.patch.yml` / `.example` | Bundle patch layer |
+| `test/gateway.test.cjs` | Smoke tests |
 
 ---
 
-## Security
+## Notes for contributors
 
-Installing a plugin runs third-party code with your own permissions. Run only on your own server, keep credentials away, and audit `lib/lan-gate-server.cjs` changes. Always use approval + tokens for remote access; never expose the gateway port raw on the public internet.
+- **Isolation**: the gateway is a child process. Never import its server code into the DSH process.
+- **Pass the environment explicitly**: DSH 0.2's `ctx.subprocess` scrubs ambient credentials and `DSH_*` facts before applying the caller's `env`, so every `LAN_GATE_*` value, `DSH_HOME` and the VAPID keys must be handed over in the spawn request.
+- **Scope the mobile CSS**: every rule belongs under `html[data-lan-device="phone"]` (or the `@media(max-width:820px)` fallback that excludes `desktop`). The desktop must never be affected.
+- **Stable selectors**: prefer `[data-slot]`/`[data-*]`/ARIA over hashed build class names. When DSH renames a slot the mobile layout silently stops applying — re-check the slot list against upstream `packages/client` after a DSH upgrade.
+- **Push must be encrypted**: a push service rejects a plain-text body. Use `lib/web-push.cjs`.
+
+---
 
 ## License
 
-MIT. The gateway `lib/lan-gate-server.cjs` extends `dsh-mobile-gate`; original MIT copyright/license retained — see [LICENSE](LICENSE).
+MIT. `lib/lan-gate-server.cjs` extends `dsh-mobile-gate` and keeps the original MIT copyright and licence — see [LICENSE](LICENSE).

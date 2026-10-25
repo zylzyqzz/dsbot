@@ -2,11 +2,12 @@
 #
 # Copy this block into your DSH profile patch to mount without `dsh plugin add`.
 # Replace <ABSOLUTE_PATH> with the checkout directory of this project.
-# See the host plugin-inventory docs for the exact patch schema if it shifts.
+# The row references the plugin entry by package name; the path is only needed
+# for an out-of-tree checkout that is not installed as a dependency.
+#
+# DSH 0.2 note: a patch replaces the matched row's whole `config`, so restate
+# every key the row needs if you extend it.
 - insert:
     - id: dsh-mobile-pwa
       name: dsh-mobile-pwa
       path: file:///ABSOLUTE_PATH/dsh-mobile-pwa/lan-gate.mjs
-    - id: dsh-mobile-pwa-push
-      name: dsh-mobile-pwa-push
-      path: /ABSOLUTE_PATH/dsh-mobile-pwa/dsh-push.mjs

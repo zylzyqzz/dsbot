@@ -10,8 +10,8 @@
  */
 'use strict'
 
-const SHELL_CACHE = 'dsh-mobile-pwa-shell-v1'
-const RUNTIME_CACHE = 'dsh-mobile-pwa-runtime-v1'
+const SHELL_CACHE = 'dsh-mobile-pwa-shell-v2'
+const RUNTIME_CACHE = 'dsh-mobile-pwa-runtime-v2'
 
 const SHELL_REGEX = /\.(js|mjs|css|woff2?|ttf|otf|png|webp|svg|jpg|jpeg|gif|ico)(\?|$)/i
 const API_REGEX = /^\/api\//i
@@ -124,6 +124,20 @@ self.addEventListener('push', (event) => {
     data: data.data || {}
   }
   event.waitUntil(self.registration.showNotification(title, options))
+})
+
+// A rotated push subscription has to be handed to the gateway again.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    self.registration.pushManager.getSubscription().then((sub) => {
+      if (!sub) return null
+      return fetch('/pwa/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON() })
+      })
+    }).catch(() => null)
+  )
 })
 
 self.addEventListener('notificationclick', (event) => {

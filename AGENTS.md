@@ -4,26 +4,37 @@ This file helps AI coding agents and LLM tooling understand and work in this rep
 
 ## What this repo is
 
-`dsh-mobile-pwa` is a **Cordis plugin for DeepSeek Harness (DSH)** that turns the DSH
-Web UI into a complete mobile **PWA**. It runs a **standalone Node gateway child
-process** that securely exposes the local DSH Web UI to LAN/Tailscale phones, and
-injects PWA capability (manifest, service worker, touch layout, gestures, agent-done
-push) into the served HTML.
+`dsh-mobile-pwa` is a **Cordis bundle plugin for DeepSeek Harness (DSH) 0.2.x** that turns
+the DSH Web UI into a complete mobile **PWA**. It runs a **standalone Node gateway child
+process** that securely exposes the local DSH Web UI to remote phones, and injects PWA
+capability (manifest, service worker, touch layout, gestures, agent-done notification)
+into the served HTML.
 
-- Gateway listens on `0.0.0.0:3088`; proxies approved devices to `127.0.0.1:3080`.
-- DSH's own webserver stays `127.0.0.1` — the gateway never touches DSH config or
-  its `/api` trust fence.
+- Gateway listens on `0.0.0.0:3088`; proxies approved devices to the DSH Web UI address.
+- DSH 0.2 **refuses a wildcard bind address** (`--host 0.0.0.0` is rejected at load), so
+  the Web UI always stays on one concrete local address. The gateway is the remote door:
+  it owns the exposed port and the approval gate; DSH's own `/api` trust fence is intact.
+
+## Target version
+
+- `engines.dsh: ">=0.2.0 <0.3.0"`. DSH compares that range with `includePrerelease`, so a
+  `0.2.1-rc.x` runtime satisfies it. Without this field DSH falls back to checking
+  `@deepseek-ai/dsh*` peer ranges.
+- DSH 0.1's Web-UI DOM is gone. The mobile CSS targets the 0.2 slot vocabulary
+  (`main.conversation`, `conversation.view`, `conversation.chat.flow`,
+  `conversation.input.model`, `conversation.composer.dock`, `sidebar.panellist`, ...)
+  and the 0.2 data markers (`data-composer-*`, `data-chat-*`, `data-phase`).
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
-| `lan-gate.mjs` | Cordis entry. `inject: ['subprocess']`; resolves `node`, spawns `lib/lan-gate-server.cjs`, wires disposal via `ctx.effect`. Never import the server into the DSH process. |
-| `dsh-push.mjs` | OPTIONAL agent-done push host plugin. Best-effort hooks into a DSH turn-close service and POSTs to the gateway's local `/pwa/push/send`. Must never throw. |
-| `lib/lan-gate-server.cjs` | The gateway. Single-file, **zero-dependency CommonJS**. HTTP + WebSocket reverse proxy, approval state machine, tokens, rate limit, admin page, and **HTML PWA injection** + `/pwa/*` static serving + `/pwa/push/*`. |
+| `lan-gate.mjs` | Cordis entry. `inject: ['subprocess']`; resolves `node`, resolves the Web UI address from the `webStartup` service, spawns `lib/lan-gate-server.cjs`, wires disposal via `ctx.effect`. Never import the server into the DSH process. |
+| `lib/lan-gate-server.cjs` | The gateway. Single-file, **zero-dependency CommonJS**. HTTP + WebSocket reverse proxy, approval state machine, tokens, rate limit, admin page, **HTML PWA injection**, `/pwa/*` static serving, `/pwa/push/*`. |
+| `lib/web-push.cjs` | Real Web Push: VAPID keypair + ES256 JWT, ECDH/HKDF derivation, AES-128-GCM body encryption. Zero dependencies, WebCrypto only. |
 | `pwa/manifest.json` | PWA install manifest. |
-| `pwa/sw.js` | Service worker: cache strategies + push notifications. |
-| `pwa/inject.js` | Injected page bootstrap: SW register, gesture loader, push subscribe. |
+| `pwa/sw.js` | Service worker: cache strategies, push notifications, `pushsubscriptionchange`. |
+| `pwa/inject.js` | Injected page bootstrap: SW register, gesture loader, push subscribe, agent-done detection. |
 | `pwa/touch-gestures.js` | Pull-to-refresh / edge-swipe / pinch-zoom. |
 | `pwa/app.css` | Mobile touch-first CSS (< 44px targets, safe-area, compact type). |
 | `pwa/offline.html` | Offline fallback page. |
@@ -35,29 +46,38 @@ push) into the served HTML.
 
 1. **Isolation**: the gateway is a child process. Never import its server code into
    the DSH process; keep spawn + lifecycle in `lan-gate.mjs`.
-2. **`pwa/` serves the real browser scripts**: `/pwa/manifest.json`, `/pwa/sw.js`,
+2. **Explicit child environment**: DSH 0.2's `ctx.subprocess` scrubs ambient credentials
+   and `DSH_*` facts before applying the caller's `env`. Every value the gateway reads
+   (`LAN_GATE_*`, `DSH_HOME`, VAPID keys) must be passed explicitly in the spawn request.
+3. **`pwa/` serves the real browser scripts**: `/pwa/manifest.json`, `/pwa/sw.js`,
    `/pwa/app.css`, `/pwa/icons/*` are served from disk (read via `servePwaAsset`).
    The service worker MUST live at a fixed path (`/pwa/sw.js`) for registration to
    scope correctly.
-3. **Scope mobile CSS**: every mobile rule must be prefixed with
+4. **Scope mobile CSS**: every mobile rule must be prefixed with
    `html[data-lan-device="phone"]` (or the `@media (max-width:820px)` fallback that
    excludes `desktop`). Desktop must never be affected.
-4. **Stable selectors**: prefer `[data-slot]`/ARIA selectors over hashed build class
-   names (`Sh0Q9G_` etc.), which change per frontend build.
-5. **Persistence**: approvals stored at `~/.dsh/lan-gate-state.json`; the pending
-   list (`seen`) is in-memory and resets on restart.
-6. **Local-only admin**: `/lan-gate/status`, `/lan-gate/action`, `/pwa/push/send`
-   must reject non-local sockets (403).
-7. **Port fallback**: on `EADDRINUSE`, server increments the port (up to +20).
-8. **Injection quoting**: the HTML-injected inline CSS/JS strings in
-   `lib/lan-gate-server.cjs` are JS string literals — keep quote usage consistent
-   (historical bug: double quotes inside double quotes broke the injected script).
+5. **Stable selectors**: prefer `[data-slot]`/`[data-*]`/ARIA selectors over hashed build
+   class names (`Sh0Q9G_` etc.), which change per frontend build. When DSH renames a
+   slot, the mobile layout silently stops applying — re-check the slot list against the
+   upstream `packages/client` sources.
+6. **Persistence**: approvals stored at `~/.dsh/lan-gate-state.json`; the VAPID keypair at
+   `~/.dsh/lan-gate-vapid.json`; the pending list (`seen`) is in-memory and resets on restart.
+7. **Local-only admin**: `/lan-gate/status`, `/lan-gate/action` must reject non-local
+   sockets (403). `/pwa/push/send` additionally accepts an approved device, so a phone can
+   report "the agent finished" for the other subscribers.
+8. **Push must be encrypted**: a push service rejects a plain-text body. Use
+   `lib/web-push.cjs` (`encryptPayload` + `buildVapidAuthorization`), never plain JSON.
+9. **Port fallback**: on `EADDRINUSE`, server increments the port (up to +20).
+10. **Injection quoting**: the HTML-injected inline CSS/JS strings in
+    `lib/lan-gate-server.cjs` are JS string literals — keep quote usage consistent
+    (historical bug: double quotes inside double quotes broke the injected script).
 
 ## Common tasks
 
-- **Change port / rate / target**: top-of-file constants in
-  `lib/lan-gate-server.cjs` or env vars `LAN_GATE_PORT`, `LAN_GATE_HOST`,
-  `LAN_GATE_TARGET_PORT`, `LAN_GATE_RATE_LIMIT`, `LAN_GATE_VAPID_PUBLICKEY`.
+- **Change port / rate / target**: env vars `LAN_GATE_PORT`, `LAN_GATE_HOST`,
+  `LAN_GATE_TARGET_HOST`, `LAN_GATE_TARGET_PORT`, `LAN_GATE_RATE_LIMIT`,
+  `LAN_GATE_VAPID_PUBLICKEY`, `LAN_GATE_VAPID_PRIVATEKEY`, `LAN_GATE_VAPID_SUBJECT`.
+  The plugin resolves the target automatically from `webStartup`; the env var wins.
 - **Add a mobile CSS tweak**: append a `html[data-lan-device="phone"] ...` rule to
   `pwa/app.css` (kept in the file loaded by the injected `<link>`).
 - **Change injected page behaviour**: edit `pwa/inject.js` (wired into the injected
@@ -73,4 +93,4 @@ npm test
 
 Runs `node --test test/*.test.cjs`, booting `lib/lan-gate-server.cjs` behind a mock
 DSH upstream (isolated temp `DSH_HOME`) and asserting `/pwa` asset serving, HTML
-injection, and PWA status reporting.
+injection, PWA status reporting, and the Web Push encryption round-trip.

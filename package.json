@@ -1,13 +1,12 @@
 {
   "name": "dsh-mobile-pwa",
-  "version": "0.1.0",
-  "description": "Complete mobile PWA for DeepSeek Harness (DSH): secure LAN/Tailscale remote access gateway + install-to-homescreen (manifest), offline-capable service worker, touch-first gestures, agent-done notifications, and dark compact mobile UI. 移动端 PWA 完整方案 for DeepSeek Harness.",
+  "version": "0.2.0",
+  "description": "Complete mobile PWA for DeepSeek Harness (DSH): secure remote-access gateway + install-to-homescreen manifest + offline-capable service worker + touch-first gestures + agent-done notifications + dark compact mobile UI. 移动端 PWA 完整方案 for DeepSeek Harness.",
   "license": "MIT",
   "type": "module",
   "main": "lan-gate.mjs",
   "files": [
     "lan-gate.mjs",
-    "dsh-push.mjs",
     "lib",
     "pwa",
     "cordis.patch.yml",
@@ -52,6 +51,7 @@
     "url": "git+https://github.com/zylzyqzz/dsh-mobile-pwa.git"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.0.0",
+    "dsh": ">=0.2.0 <0.3.0"
   }
 }
