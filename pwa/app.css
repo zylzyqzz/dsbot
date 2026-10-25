@@ -232,9 +232,154 @@ html[data-dsh-lan-drawer="on"] .bt-row:active {
   background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 6%, transparent);
 }
 
-/* The drawer's own row presses a little harder: it is the primary surface. */
-html[data-dsh-lan-drawer="on"] .dsh-lan-bar-item:active {
-  transform: scale(.9);
+/* =====================================================================
+ * Composer, Muse register.
+ *
+ * A pill floating over the conversation: one rounded surface, the plus on the
+ * left, the mic on the right, the field itself transparent inside it. DSH
+ * builds this out of a stack plus two slots, so the surface has to be drawn
+ * on the stack and the padding moved off the dock.
+ * ===================================================================== */
+html[data-dsh-lan-drawer="on"] .wSkVaW_composerStack {
+  padding: 0 10px calc(10px + max(env(safe-area-inset-bottom), 0px)) !important;
+  background: transparent !important;
+}
+
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"] {
+  background: var(--dsw-alias-bg-base, #fff);
+  border: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .22));
+  border-radius: 26px;
+  padding: 0 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  transition: border-color var(--lan-fast, 140ms) linear,
+              box-shadow var(--lan-fast, 140ms) linear;
+}
+
+/* Focus reads as a slightly darker edge rather than a glow: a phone screen
+   under a thumb does not need a halo. */
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"]:focus-within {
+  border-color: var(--dsw-alias-border-l2, rgba(128, 128, 128, .4));
+}
+
+/* The composer card inside the dock is what actually holds the field. */
+html[data-dsh-lan-drawer="on"] [data-composer-card] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 26px !important;
+}
+
+/* The plus and the mic sit inside the pill, so they lose the leftover
+   padding that made the row look boxed. */
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.left"],
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.right"] {
+  padding: 0 4px !important;
+  align-items: center;
+}
+
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.left"] button,
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.right"] button {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border-radius: 999px !important;
+}
+
+/* The field keeps its own line height inside the pill. */
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"] textarea,
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"] [contenteditable="true"] {
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+}
+
+/* =====================================================================
+ * Drawer contents, Muse register.
+ *
+ * Muse leads its drawer with the product name in large type, then a group
+ * label over the destinations and a quieter one over the rest. DSH's sidebar
+ * has the rows but no such header, so the header and the group label are
+ * drawn above the row list.
+ * ===================================================================== */
+html[data-dsh-lan-drawer="on"] .hHd-Xa_root {
+  background: var(--dsw-alias-bg-base, #fff) !important;
+}
+
+html[data-dsh-lan-drawer="on"] .hHd-Xa_regionArea {
+  padding-top: 0 !important;
+}
+
+html[data-dsh-lan-drawer="on"] .hHd-Xa_regionArea::after { content: none; }
+
+/* The bot rows become Muse's list rows: room around the name, a soft pill
+   for the one you are in, no card borders. */
+html[data-dsh-lan-drawer="on"] .bt-row {
+  border-radius: 12px !important;
+  padding: 6px 8px !important;
+  margin: 0 10px 2px !important;
+  transition: background-color var(--lan-fast, 140ms) linear;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-row[aria-current="true"],
+html[data-dsh-lan-drawer="on"] .bt-row[data-active="true"],
+html[data-dsh-lan-drawer="on"] .bt-row[data-selected="true"] {
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 7%, transparent) !important;
+}
+
+/* The sidebar already carries its own brand line, so that line becomes the
+   Muse masthead and the group label hangs under it. */
+html[data-dsh-lan-drawer="on"] .bt-side-top {
+  padding: 0 16px 0 !important;
+  min-height: 46px !important;
+  height: auto !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-brand {
+  font: 700 27px/1.22 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+  letter-spacing: -.025em !important;
+  color: var(--dsw-alias-text-primary, #111) !important;
+  height: auto !important;
+  gap: 9px !important;
+}
+
+/* The whale mark is part of the masthead, so it grows with the type. */
+html[data-dsh-lan-drawer="on"] .bt-brand .bt-mark,
+html[data-dsh-lan-drawer="on"] .bt-brand .bt-brand-whale {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+/* The bot tiles are a 2-up card gallery in the app; Muse lists its entries as
+   full-width rows with the mark on the left. Same content, less furniture. */
+html[data-dsh-lan-drawer="on"] .bt-tile-wrap {
+  padding: 0 10px !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-tile {
+  width: 100% !important;
+  height: 60px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  padding: 8px 12px !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  text-align: left !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-tile:active {
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 7%, transparent) !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-tile .bt-mark,
+html[data-dsh-lan-drawer="on"] .bt-tile .bt-mark > svg {
+  width: 34px !important;
+  height: 34px !important;
+  flex: none !important;
 }
 
 html[data-dsh-lan-drawer="on"] .dsh-lan-frame {
@@ -254,7 +399,9 @@ html[data-dsh-lan-drawer="on"] .dsh-lan-sidebar-col {
      shadow drawn there still bleeds onto the screen as a seam. It is turned
      on only while the drawer is actually open. */
   box-shadow: none;
-  padding-top: 52px;
+  /* The ☰ sits over the masthead row, so the drawer only needs the safe area
+     plus a hair of clearance, not a full app-bar's height. */
+  padding-top: calc(env(safe-area-inset-top) + 44px);
   border-right: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .22));
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -433,6 +580,40 @@ html[data-dsh-lan-drawer="on"] .bt-head .bt-pill:active {
 
   [role="dialog"][aria-modal="true"] .bt-set-section {
     max-width: 100% !important;
+  }
+
+  /* ---- Muse card language ----
+     Muse groups its settings into soft, borderless cards with generous inner
+     padding and hairline separators between rows; DSH ships harsher radii and
+     tighter rows. Same structure, softer surface. */
+  [role="dialog"][aria-modal="true"] .bt-settings-page {
+    padding: 12px 16px 28px !important;
+    background: var(--bt-panel, #f7f7f7) !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-set-section {
+    background: var(--bt-main, #fff) !important;
+    border-radius: 16px !important;
+    border: 0 !important;
+    padding: 4px 14px !important;
+    margin-bottom: 14px !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  }
+
+  /* Rows inside a card: roomy, with a hairline under everything but the last. */
+  [role="dialog"][aria-modal="true"] .bt-set-row {
+    padding: 13px 0 !important;
+    border-top: 1px solid var(--bt-line, rgba(128, 128, 128, .14));
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-set-row:first-child {
+    border-top: 0 !important;
+  }
+
+  /* The page title reads as Muse's section heading. */
+  [role="dialog"][aria-modal="true"] .bt-settings-head h2 {
+    font: 700 22px/1.3 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+    letter-spacing: -.02em !important;
   }
 }
 
