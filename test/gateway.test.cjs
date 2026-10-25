@@ -264,16 +264,31 @@ function extractInlineScripts(html) {
   return out
 }
 
-test('gateway: injected inline scripts have balanced braces (quoting bug guard)', async () => {
+test('gateway: injected inline scripts are valid JavaScript (quoting bug guard)', async () => {
   await withGateway(async ({ port }) => {
     const page = await get(port, '/')
     const scripts = extractInlineScripts(page.body)
     assert.ok(scripts.length > 0, 'expected inline scripts')
     for (const s of scripts) {
       assert.ok(balanced(s), 'inline script braces balanced: ' + s.slice(0, 40))
+      // Braces alone are not enough — a stray quote still parses as balanced
+      // but throws a SyntaxError in the browser, and then the whole bootstrap
+      // never runs (no service worker, no push, no agent-done notification).
+      // Compile without executing: that is what the browser does.
+      assert.doesNotThrow(
+        () => new Function(s),
+        'inline script compiles: ' + JSON.stringify(s.slice(0, 120))
+      )
     }
     assert.ok(page.body.includes('window.__DSH_PWA__'), 'bootstrap present')
     assert.ok(page.body.includes('randomUUID'), 'uuid polyfill present')
+    // The bootstrap payload has to be a well-formed object literal.
+    const m = page.body.match(/window\.__DSH_PWA__=(\{[^;]*\});/)
+    assert.ok(m, 'bootstrap payload found')
+    const payload = JSON.parse(m[1].replace(/([{,])([A-Za-z_$][\w$]*):/g, '$1"$2":'))
+    assert.strictEqual(typeof payload.vapid, 'string', 'vapid is a string')
+    assert.strictEqual(typeof payload.pushReady, 'boolean', 'pushReady is a boolean')
+    assert.strictEqual(typeof payload.target, 'string', 'target is a string')
   })
 })
 
@@ -285,6 +300,38 @@ function balanced(s) {
   }
   return depth === 0
 }
+
+test('gateway: a closing tag inside the bootstrap cannot break the page', async () => {
+  // The bootstrap is inlined into the document, so a "</script" inside it would
+  // end the block early and turn the rest of the file into markup. The gateway
+  // neutralises it; this pins that behaviour down.
+  const pwaDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-pwa-fixture-'))
+  fs.writeFileSync(
+    path.join(pwaDir, 'inject.js'),
+    'window.__FIXTURE__ = { close: "</script>", open: "<!--" };\n',
+    'utf8'
+  )
+  await withGateway(async ({ port }) => {
+    const page = await get(port, '/')
+    const scripts = extractInlineScripts(page.body)
+    assert.ok(scripts.length > 0, 'expected inline scripts')
+    for (const s of scripts) {
+      assert.ok(!/<\/script/i.test(s), 'no raw closing tag inside the script body')
+      assert.ok(!/<!--/.test(s), 'no raw comment opener inside the script body')
+      assert.doesNotThrow(
+        () => new Function(s),
+        'inline script still compiles: ' + JSON.stringify(s.slice(0, 120))
+      )
+    }
+    // The escape has to be invisible to the JavaScript: the string values the
+    // bootstrap sees must be exactly what the source file said.
+    const fake = {}
+    const boot = scripts.find((s) => s.includes('__DSH_PWA__'))
+    new Function('window', boot)(fake)
+    assert.strictEqual(fake.__FIXTURE__.close, '</script>', 'closing tag survives verbatim')
+    assert.strictEqual(fake.__FIXTURE__.open, '<!--', 'comment opener survives verbatim')
+  }, { LAN_GATE_PWA_DIR: pwaDir })
+})
 
 test('push: subscribe endpoint refuses insecure and keyless subscriptions', async () => {
   await withGateway(async ({ port }) => {
