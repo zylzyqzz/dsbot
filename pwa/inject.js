@@ -272,6 +272,7 @@
     chromeExemptClose()
     if (chromeState.frame && !chromeState.frame.hasAttribute('data-sidebar-collapsed')) {
       try { launcher.click() } catch (e) { return false }
+      chromeSettingsNow()
       return true
     }
     var toggle = chromeToggleButton()
@@ -280,7 +281,8 @@
     setTimeout(function () {
       chromeExemptClose()
       try { launcher.click() } catch (e) { /* ignore */ }
-    }, 300)
+      chromeSettingsNow()
+    }, 320)
     return true
   }
 
@@ -293,6 +295,21 @@
     chromeExemptClose()
     try { entry.click() } catch (e) { return false }
     return true
+  }
+
+  // The gear is a settings door, not an account menu: the menu flashes open
+  // only because that is how DSH reaches the entry. So the entry is taken as
+  // soon as the menu exists, retried briefly because the popover mounts on the
+  // next frame, and the menu is dismissed if it never shows up.
+  function chromeSettingsNow() {
+    var tries = 0
+    var step = function () {
+      if (chromePickSettings()) return
+      if (++tries < 14) { setTimeout(step, 40); return }
+      // Nothing to take: close the orphaned menu so the tap is not a dead end.
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    }
+    step()
   }
 
   // The bottom row is the Muse navigation: five hairline glyphs, no labels, no
@@ -422,7 +439,7 @@
     if (launcherBtn && !launcherBtn.getAttribute('data-lan-gear')) {
       launcherBtn.setAttribute('data-lan-gear', '1')
       launcherBtn.addEventListener('click', function () {
-        setTimeout(chromePickSettings, 120)
+        chromeSettingsNow()
       }, true)
     }
     chromeSync()

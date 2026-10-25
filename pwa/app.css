@@ -327,28 +327,54 @@ html[data-dsh-lan-drawer="on"] .bt-row[data-selected="true"] {
 }
 
 /* The sidebar already carries its own brand line, so that line becomes the
-   Muse masthead and the group label hangs under it. */
+   Muse masthead: it sits on the top row at full size, the three round actions
+   move to the right edge of that same row, and the row clears the close
+   button that floats over the drawer's corner. */
 html[data-dsh-lan-drawer="on"] .bt-side-top {
-  padding: 0 16px 0 !important;
-  min-height: 46px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  padding: 0 12px 0 52px !important;
+  min-height: 52px !important;
   height: auto !important;
   flex-wrap: nowrap !important;
-  align-items: center !important;
 }
 
 html[data-dsh-lan-drawer="on"] .bt-brand {
-  font: 700 27px/1.22 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important;
-  letter-spacing: -.025em !important;
+  font: 700 26px/1.15 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+  letter-spacing: -.03em !important;
   color: var(--dsw-alias-text-primary, #111) !important;
   height: auto !important;
-  gap: 9px !important;
+  gap: 8px !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
 }
 
 /* The whale mark is part of the masthead, so it grows with the type. */
 html[data-dsh-lan-drawer="on"] .bt-brand .bt-mark,
 html[data-dsh-lan-drawer="on"] .bt-brand .bt-brand-whale {
-  width: 26px !important;
-  height: 26px !important;
+  width: 27px !important;
+  height: 27px !important;
+  flex: none !important;
+}
+
+/* Search, new and split collapse into one right-aligned cluster. */
+html[data-dsh-lan-drawer="on"] .bt-side-top > .bt-round:first-of-type {
+  margin-left: auto !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-side-top .bt-round {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  flex: none !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-side-top .bt-round + .bt-round {
+  margin-left: 4px !important;
 }
 
 /* The bot tiles are a 2-up card gallery in the app; Muse lists its entries as
@@ -399,9 +425,10 @@ html[data-dsh-lan-drawer="on"] .dsh-lan-sidebar-col {
      shadow drawn there still bleeds onto the screen as a seam. It is turned
      on only while the drawer is actually open. */
   box-shadow: none;
-  /* The ☰ sits over the masthead row, so the drawer only needs the safe area
-     plus a hair of clearance, not a full app-bar's height. */
-  padding-top: calc(env(safe-area-inset-top) + 44px);
+  /* The masthead is the first row, so the drawer only clears the status bar:
+     the close button floats over the drawer's own corner and the row reserves
+     that space on its left instead. */
+  padding-top: env(safe-area-inset-top);
   border-right: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .22));
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -595,19 +622,72 @@ html[data-dsh-lan-drawer="on"] .bt-head .bt-pill:active {
     background: var(--bt-main, #fff) !important;
     border-radius: 16px !important;
     border: 0 !important;
-    padding: 4px 14px !important;
+    padding: 0 14px !important;
     margin-bottom: 14px !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  }
+
+  /* The card body is a flex column of rows; it must not be given a fixed
+     height or the fields inside stretch into vertical bars. */
+  [role="dialog"][aria-modal="true"] .bt-set-card {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    align-items: stretch !important;
   }
 
   /* Rows inside a card: roomy, with a hairline under everything but the last. */
   [role="dialog"][aria-modal="true"] .bt-set-row {
     padding: 13px 0 !important;
     border-top: 1px solid var(--bt-line, rgba(128, 128, 128, .14));
+    height: auto !important;
+    min-height: 0 !important;
   }
 
   [role="dialog"][aria-modal="true"] .bt-set-row:first-child {
     border-top: 0 !important;
+  }
+
+  /* Fields keep their natural height and fill the row's width. Nothing inside
+     a settings row should be allowed to stretch vertically. */
+  [role="dialog"][aria-modal="true"] .bt-set-card input,
+  [role="dialog"][aria-modal="true"] .bt-set-card textarea,
+  [role="dialog"][aria-modal="true"] .bt-set-card select {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 40px !important;
+    max-height: 160px !important;
+    align-self: stretch !important;
+    flex: none !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-set-card textarea {
+    min-height: 76px !important;
+    resize: vertical !important;
+  }
+
+  /* A field sitting in its own column should not inherit the card's full
+     height: the vertical bars in the Bot page came from exactly that. Labels
+     and fields stay top-aligned and left-aligned; only the width stretches. */
+  [role="dialog"][aria-modal="true"] .bt-set-card > * {
+    align-self: stretch !important;
+    height: auto !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+  }
+
+  /* Field text is left aligned and vertically centred inside its own box. */
+  [role="dialog"][aria-modal="true"] .bt-set-card input,
+  [role="dialog"][aria-modal="true"] .bt-set-card textarea {
+    text-align: left !important;
+    align-items: center !important;
+  }
+
+  [role="dialog"][aria-modal="true"] .bt-set-card textarea {
+    align-items: flex-start !important;
   }
 
   /* The page title reads as Muse's section heading. */
@@ -645,21 +725,28 @@ html[data-dsh-lan-drawer="on"] [data-slot="sidebar.footer.action"] > * {
    position: the absolute placement has to go on the button. */
 html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button {
   position: absolute;
-  left: 10px;
-  bottom: calc(10px + max(env(safe-area-inset-bottom), 0px));
+  left: 12px;
+  bottom: calc(12px + max(env(safe-area-inset-bottom), 0px));
   z-index: 6;
-  width: 44px !important;
-  height: 44px !important;
-  min-width: 44px !important;
-  min-height: 44px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 !important;
   border: 0 !important;
-  border-radius: 12px !important;
-  background: transparent !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 6%, transparent) !important;
   color: var(--dsw-alias-text-secondary, #6b7280) !important;
+}
+
+/* The drawer closes with a hairline above the gear so the foot reads as a
+   distinct zone instead of a stray icon in empty space. */
+html[data-dsh-lan-drawer="on"] .hHd-Xa_footArea {
+  border-top: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .14)) !important;
+  padding-top: 6px !important;
 }
 
 html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button > * {
