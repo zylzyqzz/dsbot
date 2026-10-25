@@ -4,3 +4,6 @@ node_modules/
 .pnpm-store/
 test/.tmp/
 *.tgz
+# never commit a git credential helper store
+gitcreds*
+*gitcreds*

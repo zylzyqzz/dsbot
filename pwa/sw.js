@@ -10,8 +10,9 @@
  */
 'use strict'
 
-const SHELL_CACHE = 'dsh-mobile-pwa-shell-v2'
-const RUNTIME_CACHE = 'dsh-mobile-pwa-runtime-v2'
+const SHELL_CACHE = 'dsh-mobile-pwa-shell-v3'
+const RUNTIME_CACHE = 'dsh-mobile-pwa-runtime-v3'
+const SHELL_DOCUMENT = '/__dsh-shell-document'
 
 const SHELL_REGEX = /\.(js|mjs|css|woff2?|ttf|otf|png|webp|svg|jpg|jpeg|gif|ico)(\?|$)/i
 const API_REGEX = /^\/api\//i
@@ -48,6 +49,10 @@ self.addEventListener('fetch', (event) => {
 
   // Same-origin only; we only manage the DSH origin behind the gateway.
   if (url.origin !== self.location.origin) return
+
+  // The plugin's own assets (this worker included) always come from the
+  // network, so an updated worker never serves a stale copy of itself.
+  if (url.pathname.indexOf('/pwa/') === 0) return
 
   // 1. PWA shell static assets -> cache-first.
   if (req.method === 'GET' && SHELL_REGEX.test(url.pathname)) {
@@ -97,11 +102,15 @@ async function networkFirstNavigation(req) {
   const cache = await caches.open(SHELL_CACHE)
   try {
     const res = await fetch(req)
-    if (res && res.ok) cache.put('/pwa/offline.html', res.clone())
+    // Keep the last served document under its own key: the offline page stays
+    // the offline page instead of being overwritten by the app shell.
+    if (res && res.ok) cache.put(SHELL_DOCUMENT, res.clone())
     return res
   } catch (err) {
-    const cached = await cache.match('/pwa/offline.html')
+    const cached = await cache.match(SHELL_DOCUMENT)
     if (cached) return cached
+    const offline = await cache.match('/pwa/offline.html')
+    if (offline) return offline
     // Last resort: offline fallback hint.
     return new Response(
       '<!doctype html><meta charset="utf-8"><title>离线</title><style>body{font-family:system-ui;background:#0f1115;color:#e6e8ec;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}p{max-width:24em;text-align:center;line-height:1.7}</style><script>setInterval(()=>location.reload(),4000)</script><p>无法连接到 DSH 服务器，正在重试…<br>请确认你的网关与服务仍在运行。</p>',

@@ -27,7 +27,10 @@
   var swReady = null
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/pwa/sw.js').then(function (reg) {
+      // The worker lives under /pwa/ but must control the whole origin for the
+      // offline shell to cover the DSH routes; the gateway sends
+      // Service-Worker-Allowed: / so this scope is accepted.
+      navigator.serviceWorker.register('/pwa/sw.js', { scope: '/' }).then(function (reg) {
         PWA.reg = reg
       }).catch(function (err) {
         console.warn('[dsh-pwa] SW registration failed:', err)

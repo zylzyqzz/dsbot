@@ -145,6 +145,9 @@ test('gateway: serves PWA assets (/pwa/manifest.json, /pwa/sw.js)', async () => 
     const sw = await get(port, '/pwa/sw.js')
     assert.strictEqual(sw.status, 200)
     assert.ok(sw.body.includes('dsh-mobile-pwa'))
+    // The worker lives under /pwa/ but has to claim the whole origin.
+    assert.strictEqual(sw.headers['service-worker-allowed'], '/',
+      'sw.js is allowed to claim the root scope')
   })
 })
 
