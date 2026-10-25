@@ -66,25 +66,31 @@ into the served HTML.
 7. **Approval binds an address, a token binds a browser**: never collapse them back into one
    token per address. A phone and a laptop behind the same NAT share one public address, and
    the single-token design locked the second browser out with "需要重新授权". Each browser of
-   an approved device mints its own token. The count is bounded by `LAN_GATE_MAX_TOKENS`
-   (default 8), but hitting it evicts the **oldest** token — never locks the new browser out.
-8. **Local-only admin**: `/lan-gate/status`, `/lan-gate/action` must reject non-local
+   an approved device mints its own token. There is deliberately **no cap** on how many
+   browsers one approved device holds — the address is what was approved.
+8. **Optional password gate**: `LAN_GATE_PASSWORD` puts a login page in front of everything
+   except the local-only admin endpoints. The password must never be logged, never written
+   into the repository, and never sent to the browser — the browser stores an HMAC-derived
+   proof (`lg_pass` cookie, HttpOnly, 30 days). The comparison is constant-time. Because
+   `ctx.subprocess` scrubs the child environment, the plugin has to hand
+   `LAN_GATE_PASSWORD` over explicitly.
+9. **Local-only admin**: `/lan-gate/status`, `/lan-gate/action` must reject non-local
    sockets (403). `/pwa/push/send` additionally accepts an approved device, so a phone can
    report "the agent finished" for the other subscribers.
-9. **Push must be encrypted**: a push service rejects a plain-text body. Use
-   `lib/web-push.cjs` (`encryptPayload` + `buildVapidAuthorization`), never plain JSON.
-10. **Forward the browser-facing Host**: DSH 0.2's Host/Origin fence compares the
+10. **Push must be encrypted**: a push service rejects a plain-text body. Use
+    `lib/web-push.cjs` (`encryptPayload` + `buildVapidAuthorization`), never plain JSON.
+11. **Forward the browser-facing Host**: DSH 0.2's Host/Origin fence compares the
     received Host against the accepted authorities, and the browser session cookie
     is bound to that authority. The gateway therefore forwards Host unchanged
     (override with `LAN_GATE_REWRITE_HOST=1`). The public authority must be
     trusted: `LAN_GATE_TRUSTED_HOSTS` or `--trusted-host`.
-11. **Browser session bootstrap**: DSH only signs a session cookie for a request
+12. **Browser session bootstrap**: DSH only signs a session cookie for a request
     carrying the process launch token. The plugin reads that token from
     `ctx.connection.authenticatedUrl()` and passes it to the gateway, which
     exchanges it for the browser's cookie. Never print or require the tokenized
     launch URL.
-12. **Port fallback**: on `EADDRINUSE`, server increments the port (up to +20).
-13. **Injection quoting**: the HTML-injected inline CSS/JS strings in
+13. **Port fallback**: on `EADDRINUSE`, server increments the port (up to +20).
+14. **Injection quoting**: the HTML-injected inline CSS/JS strings in
     `lib/lan-gate-server.cjs` are JS string literals — keep quote usage consistent
     (historical bug: double quotes inside double quotes broke the injected script).
 

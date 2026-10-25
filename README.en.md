@@ -15,7 +15,7 @@ Built on the MIT [`dsh-mobile-gate`](https://github.com/Bernardxu123/dsh-mobile-
 
 | Module | What it does |
 | --- | --- |
-| 📡 **Secure remote access** | Standalone child-process gateway: first-visit approval (the approval binds an address, the token binds a browser — a phone and a laptop behind one NAT can be signed in at the same time), per-IP rate limit. The DSH webserver itself stays on loopback, so its `/api` trust fence is untouched. |
+| 📡 **Secure remote access** | Standalone child-process gateway: first-visit approval (the approval binds an address, the token binds a browser — a phone and a laptop behind one NAT can be signed in at the same time), optional access password, per-IP rate limit. The DSH webserver itself stays on loopback, so its `/api` trust fence is untouched. |
 | 📱 **Real PWA** | `manifest.json` + service worker: install-to-homescreen runs it as a standalone app with icon, splash and theme colour. |
 | 🌐 **Offline capable** | Static shell cached first, API network-first, navigation falls back to an offline page. |
 | 👆 **Touch gestures** | Pull-to-refresh, edge-swipe back, pinch font zoom. |
@@ -68,7 +68,7 @@ dsh plugin --profile web add ./dsh-mobile-pwa
 | `LAN_GATE_TARGET_HOST` | `127.0.0.1` | DSH Web UI host (the plugin fills `webStartup.host`; this wins) |
 | `LAN_GATE_TARGET_PORT` | `3080` | DSH Web UI port (the plugin fills `webStartup.port`; this wins) |
 | `LAN_GATE_RATE_LIMIT` | `120` | Requests per IP per minute |
-| `LAN_GATE_MAX_TOKENS` | `8` | How many browser tokens one approved device keeps (one per browser; past the limit the oldest is evicted, the new browser is never locked out) |
+| `LAN_GATE_PASSWORD` | – | Access password. When set, the gateway asks for it before serving anything. The password stays on the server; the browser only gets an HMAC-derived session cookie |
 | `LAN_GATE_TRUSTED_HOSTS` | – | **Public authorities the gateway serves**, comma separated (`111.170.171.25,app.example`). DSH 0.2's Host/Origin fence compares the browser-facing Host, which the gateway forwards unchanged, so the public authority has to be declared here; a port-less entry matches any port |
 | `LAN_GATE_REWRITE_HOST` | – | Set to `1` to rewrite Host to the loopback address (only needed by older DSH) |
 | `LAN_GATE_DSH_TOKEN` | auto | DSH process launch token; the plugin reads it from `ctx.connection` and hands it to the gateway |

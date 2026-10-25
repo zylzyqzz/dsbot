@@ -25,13 +25,14 @@
 
 ## T-真机反馈修复（✅ 完成 · 18/18 测试通过）
 - [x] 定位「需要重新授权」根因：一个 IP 只有一枚令牌 + `issued` 标志，先到先占
-- [x] 新增 `lib/lan-gate-auth.cjs`：审批绑 IP、令牌绑浏览器（每设备多令牌，上限 `LAN_GATE_MAX_TOKENS=8`）
+- [x] 新增 `lib/lan-gate-auth.cjs`：审批绑 IP、令牌绑浏览器（令牌数**不设上限**）
 - [x] 令牌随 302 直接下发 cookie，撤掉 `?t=` 中转 URL
 - [x] `set-kind` 保留令牌（改访问方式不再踢人下线）
 - [x] 旧版单令牌状态文件自动迁移，已登录浏览器不掉线
 - [x] `/pwa/push/send` 放开「已批准设备 + 持令牌」；无订阅时返回 200
 - [x] manifest 合并为唯一一份（PNG 图标优先、`display:standalone`、整页 1 个 manifest / 1 个 theme-color）
-- [x] 测试 18 项全绿；文档同步（README 中英 / AGENTS.md / llms.txt / .ai）
+- [x] **可选访问密码**（`LAN_GATE_PASSWORD`）：登录页 + HMAC 会话 cookie + 恒定时间比较；本地管理端点豁免
+- [x] 测试 21 项全绿；文档同步（README 中英 / AGENTS.md / llms.txt / .ai）
 
 ## 历史：v0.1.0 收尾（✅ 已发布进社区）
 - [x] 拉取参考基座并解析架构

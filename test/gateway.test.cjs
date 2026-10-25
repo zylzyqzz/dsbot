@@ -142,6 +142,26 @@ function tokenCookie(res) {
   return hit.split(';')[0]
 }
 
+/** POST an application/x-www-form-urlencoded form, the way a login page does. */
+function postForm(port, urlPath, fields, cookie) {
+  return new Promise((resolve, reject) => {
+    const data = new URLSearchParams(fields).toString()
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(data)
+    }
+    if (cookie) headers.cookie = cookie
+    const req = http.request({ host: '127.0.0.1', port: port, path: urlPath, method: 'POST', headers }, (res) => {
+      let body = ''
+      res.on('data', (c) => { body += c })
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }))
+    })
+    req.on('error', reject)
+    req.write(data)
+    req.end()
+  })
+}
+
 function post(port, urlPath, payload, cookie) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload)
@@ -472,22 +492,25 @@ test('auth: a revoked device falls back to the approval wall', () => {
   assert.strictEqual(auth.tokenList(decisions['1.2.3.4']).length, 0, 'revoking drops the tokens')
 })
 
-test('auth: the browser cap evicts the oldest browser instead of locking the new one out', () => {
+test('auth: an approved device holds as many browsers as it needs', () => {
   const auth = require('../lib/lan-gate-auth.cjs')
   const decisions = {}
   auth.approveDevice(decisions, '1.2.3.4', 'phone')
-  const old = []
-  for (let i = 0; i < auth.MAX_TOKENS_PER_DEVICE; i++) {
-    const t = auth.randomToken()
-    old.push(t)
-    decisions['1.2.3.4'].tokens.push(t)
+
+  // The address is what was approved; the token only says which browser this
+  // is. There is deliberately no cap, so nobody is ever locked out.
+  const tokens = []
+  for (let i = 0; i < 40; i++) {
+    const verdict = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined)
+    assert.strictEqual(verdict.action, 'issue', 'every new browser is let in')
+    decisions['1.2.3.4'].tokens = verdict.tokens
+    tokens.push(verdict.token)
   }
-  const verdict = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined)
-  assert.strictEqual(verdict.action, 'issue', 'a new browser is never locked out')
-  assert.strictEqual(verdict.tokens.length, auth.MAX_TOKENS_PER_DEVICE, 'the cap still bounds the list')
-  assert.ok(verdict.tokens.includes(verdict.token), 'the new token is stored')
-  assert.ok(!verdict.tokens.includes(old[0]), 'the oldest browser was evicted')
-  assert.ok(verdict.tokens.includes(old[old.length - 1]), 'the newer browsers survive')
+  assert.strictEqual(auth.tokenList(decisions['1.2.3.4']).length, 40, 'no browser was dropped')
+  for (const token of tokens) {
+    assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', token, undefined).action, 'forward',
+      'every browser stays signed in')
+  }
 })
 
 test('auth: a state file written by the single-token gateway keeps the signed-in browser', () => {
@@ -559,4 +582,61 @@ test('gateway: an approved device can raise the agent-done push itself', async (
     const refused = await post(port, '/pwa/push/send', { title: 'x', body: 'y' })
     assert.strictEqual(refused.status, 403, 'a caller without a token may not')
   }, { LAN_GATE_TEST_CLIENT_IP: remote, LAN_GATE_TEST_REMOTE: '1' }, seed)
+})
+
+// ---- optional password gate --------------------------------------------------
+
+test('gateway: the password gate hides the app until the password is entered', async () => {
+  await withGateway(async ({ port }) => {
+    // No password entered: the page is the login form, not the DSH app.
+    const locked = await get(port, '/')
+    assert.strictEqual(locked.status, 200)
+    assert.ok(locked.body.includes('需要密码'), 'the login page is shown')
+    assert.ok(locked.body.includes('name="pw"'), 'the login form has a password field')
+    assert.ok(!locked.body.includes('data-lan-device'), 'the DSH app is not served')
+    assert.ok(!locked.body.includes('__DSH_PWA__'), 'the PWA bootstrap is not injected')
+
+    // A wrong password is refused and grants nothing.
+    const wrong = await postForm(port, '/lan-gate/login', { pw: 'not-it', next: '/' })
+    assert.strictEqual(wrong.status, 200)
+    assert.ok(wrong.body.includes('密码不正确'), 'the failure is reported')
+    assert.ok(!(wrong.headers['set-cookie'] || []).some((c) => c.startsWith('lg_pass=')), 'no session cookie is issued')
+
+    // The right password opens the gate.
+    const ok = await postForm(port, '/lan-gate/login', { pw: 'test-pass', next: '/' })
+    assert.strictEqual(ok.status, 302)
+    assert.strictEqual(ok.headers.location, '/')
+    const passCookie = (ok.headers['set-cookie'] || []).find((c) => c.startsWith('lg_pass='))
+    assert.ok(passCookie, 'a session cookie is issued')
+    assert.ok(passCookie.includes('HttpOnly'), 'the session cookie is not readable by scripts')
+    assert.ok(!passCookie.includes('test-pass'), 'the password itself is never sent to the browser')
+
+    // With the cookie, the app is reachable again.
+    const page = await getWithCookie(port, '/', passCookie.split(';')[0])
+    assert.strictEqual(page.status, 200)
+    assert.ok(page.body.includes('__DSH_PWA__'), 'the PWA bootstrap is injected')
+  }, { LAN_GATE_PASSWORD: 'test-pass' })
+})
+
+test('gateway: without a configured password there is no login page', async () => {
+  await withGateway(async ({ port }) => {
+    const page = await get(port, '/')
+    assert.strictEqual(page.status, 200)
+    assert.ok(!page.body.includes('需要密码'), 'the gateway is open when no password is set')
+  })
+})
+
+test('gateway: the password gate covers the WebSocket relay too', async () => {
+  await withGateway(async ({ port }) => {
+    // The upgrade path must refuse a socket that carries no password cookie.
+    const { status } = await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: port, path: '/', headers: { connection: 'Upgrade', upgrade: 'websocket' } })
+      req.on('upgrade', () => resolve({ status: 101 }))
+      req.on('response', (res) => resolve({ status: res.statusCode }))
+      req.on('error', reject)
+      req.end()
+    })
+    // The gateway answers a non-local upgrade without the password with 403.
+    assert.notStrictEqual(status, 101, 'the relay does not open without the password')
+  }, { LAN_GATE_PASSWORD: 'test-pass' })
 })
