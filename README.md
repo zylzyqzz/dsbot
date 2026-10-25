@@ -18,7 +18,7 @@
 
 | 模块 | 说明 |
 | --- | --- |
-| 📡 **安全远程访问** | 独立子进程网关，首次访问**本机审批** + **每设备一次性令牌** + **每 IP 限流**。DSH 主服务仍只监听本机回环，`/api` 信任栅栏不受影响 |
+| 📡 **安全远程访问** | 独立子进程网关，首次访问**本机审批**（审批绑 IP、令牌绑浏览器，同一出口 IP 下的手机和电脑可同时在线）+ **每 IP 限流**。DSH 主服务仍只监听本机回环，`/api` 信任栅栏不受影响 |
 | 📱 **真 PWA** | `manifest.json` + `service worker`：手机浏览器「**添加到主屏**」后全屏独立窗口运行，带图标/启动屏/主题色 |
 | 🧩 **可安装** | 主屏图标、`standalone` 显示、`apple-touch-icon`、maskable 图标 |
 | 🌐 **离线可用** | service worker：静态壳缓存优先、API 网络优先、导航离线回退页 |
@@ -35,7 +35,7 @@
 ```
 手机 ──> 网关 (独立 Node 子进程 · 0.0.0.0:3088)
            ├─ 未批准 -> 「等待本机批准」页面（轮询 /lan-gate/admin）
-           ├─ 已批准+令牌Cookie -> 反向代理到 DSH Web UI (本机地址:端口)
+           ├─ 已批准+令牌Cookie -> 反向代理到 DSH Web UI (本机地址:端口)（每个浏览器各领一枚令牌）
            │      └─ HTML 注入：manifest link + PWA bootstrap + 触屏CSS + randomUUID polyfill
            ├─ /pwa/* -> 直接提供 manifest / sw.js / app.css / 图标 / offline.html
            ├─ /pwa/push/* -> 订阅 / 发送（真实加密推送）
@@ -84,6 +84,7 @@ dsh plugin --profile web add ./dsh-mobile-pwa
 | `LAN_GATE_TARGET_HOST` | `127.0.0.1` | 本机 DSH Web UI 地址（插件会自动填 `webStartup.host`，此变量优先） |
 | `LAN_GATE_TARGET_PORT` | `3080` | 本机 DSH Web UI 端口（插件会自动填 `webStartup.port`，此变量优先） |
 | `LAN_GATE_RATE_LIMIT` | `120` | 每 IP 每分钟请求上限 |
+| `LAN_GATE_MAX_TOKENS` | `8` | 单个已批准设备最多可绑定几个浏览器（每个浏览器一枚令牌） |
 | `LAN_GATE_TRUSTED_HOSTS` | 空 | **对外服务地址白名单**，逗号分隔（如 `111.170.171.25,app.example`）。DSH 0.2 的 Host/Origin 栅栏按浏览器看到的 Host 校验，网关原样透传 Host，所以这里必须声明对外地址；不带端口的条目匹配任意端口 |
 | `LAN_GATE_REWRITE_HOST` | 空 | 设为 `1` 时把 Host 改写成回环地址（仅老版本 DSH 需要） |
 | `LAN_GATE_DSH_TOKEN` | 自动 | DSH 进程 launch token，插件从 `ctx.connection` 自动读取并交给网关 |

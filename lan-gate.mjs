@@ -2,7 +2,7 @@
 //
 // Spawns the enhanced LAN/remote PWA gateway (lib/lan-gate-server.cjs) as an
 // isolated child process, reverse-proxying the local DSH Web UI with:
-//   - secure remote access (first-visit approval, one-token-per-browser, rate limit)
+//   - secure remote access (first-visit approval, per-browser token, rate limit)
 //   - PWA serving (/pwa/*) + mobile layout + touch gesture + offline + notifications
 //
 // DSH 0.2 notes:

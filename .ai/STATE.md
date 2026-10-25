@@ -4,13 +4,19 @@
 
 - **stage**: `v0.2.1 · 对齐 DSH 官方 0.2.x · 已真实部署`
 - **task**: 把插件从 DSH 0.1 时代迁移到官方 0.2.x，修掉失效的 DOM 假设，并部署到真实服务器验证
-- **status**: `代码完成 · 10/10 测试通过 · ser8 端到端验证通过`
+- **status**: `代码完成 · 18/18 测试通过 · ser8 端到端验证通过`
 - **真实部署（ser8 / 111.170.171.25）**:
   - 对外 URL：**http://111.170.171.25:3088/**（网关 0.0.0.0:3088 → DSH 127.0.0.1:3080）
   - Node 24.22.1 + pnpm 11.28.8 + `@deepseek-ai/dsh@0.2.1-rc.2`，systemd `dsh-web.service`
   - profile `web`，模型走 **MiniMax 自定义模型 API**（`openai-completions` + `api.minimaxi.com/v1`，9 个模型）
   - 实测：首次访问 303 换 session cookie → 带 cookie 200（真页面 47KB，manifest/PWA 注入齐全）→ 公网 IP 从本机可达 200
   - 待办：云安全组放行 3088（用户手动）；npm 发布 0.2.1（需用户 `npm login`）
+- **真机反馈后的修复（0.2.1 patch）**:
+  - **审批与令牌解耦**（新增 `lib/lan-gate-auth.cjs`）：审批绑 IP，令牌绑浏览器，每个浏览器各领一枚令牌（上限 `LAN_GATE_MAX_TOKENS=8`）。修掉「手机和电脑同一出口 IP，后来的浏览器被弹到『需要重新授权』」
+  - 令牌改为随 302 直接下发 cookie，`?t=` 中转 URL 取消；`set-kind` 不再踢掉已登录浏览器
+  - `/pwa/push/send` 的本地硬拦截拆掉，改由 handler 判定「已批准设备 + 持令牌」（原来手机端根本发不出完成事件）
+  - `sendPush` 无订阅时返回 200 而不是 500（没人订阅不是错误）
+  - **manifest 合并成唯一一份**：DSH 自带 `./manifest.webmanifest` 与插件 PWA 字段合并，从 `/pwa/manifest.json` 提供；PNG 图标优先、`display: standalone`，注入时删掉 DSH 原有的 manifest link 与 theme-color（保证整页只有 1 个 manifest、1 个 theme-color）
 - **本轮变更（0.1.0 → 0.2.1）**:
   - `engines.dsh: ">=0.2.0 <0.3.0"`（0.2 新增的安装期兼容性闸门，缺了会被拒装）
   - 移动端 CSS 全部改用 0.2 slot 词表；0.1 的 `[data-slot="conversation"]` 等选择器已彻底移除

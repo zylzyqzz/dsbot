@@ -13,7 +13,7 @@
 - Env: `LAN_GATE_PORT` (3088), `LAN_GATE_HOST` (0.0.0.0), `LAN_GATE_TARGET_HOST` (127.0.0.1), `LAN_GATE_TARGET_PORT` (3080), `LAN_GATE_RATE_LIMIT` (120), `LAN_GATE_VAPID_PUBLICKEY`, `LAN_GATE_VAPID_PRIVATEKEY`, `LAN_GATE_VAPID_SUBJECT`, `LAN_GATE_TRUSTED_HOSTS` (public authorities DSH must trust), `LAN_GATE_REWRITE_HOST`, `LAN_GATE_DSH_TOKEN`.
 - DSH 0.2 auth: the gateway forwards the browser-facing Host unchanged and mints DSH's signed session cookie with the process launch token (read from `ctx.connection.authenticatedUrl`), so the user opens a plain URL.
 - Admin: http://127.0.0.1:<port>/lan-gate/admin — approve/deny/revoke devices, pick phone/desktop/auto.
-- Security: first-visit approval, one-token-per-browser, 120 req/min per IP, loopback & LAN bypass.
+- Security: first-visit approval (an address is approved, a token identifies a browser), 120 req/min per IP, loopback & LAN bypass.
 
 ## Docs
 - README.md (中文), README.en.md (English), AGENTS.md (dev guide), LICENSE.

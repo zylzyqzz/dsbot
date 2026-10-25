@@ -7,6 +7,9 @@
  *   4. the mobile CSS targets the DSH 0.2 slot vocabulary
  *   5. Web Push encryption round-trips (RFC 8291 aes128gcm + RFC 8188 framing)
  *   6. /pwa/push/subscribe refuses an insecure or keyless subscription
+ *   7. the approval binds an address, a token binds a browser — two browsers
+ *      behind one NAT address are both let in
+ *   8. an approved device may raise the agent-done push itself
  *
  * Uses a temp DSH_HOME so the approvals file is isolated and portable.
  */
@@ -53,15 +56,21 @@ function startMockTarget() {
   })
 }
 
-function startGateway(port, targetPort) {
+function startGateway(port, targetPort, extraEnv, seed) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-mobile-pwa-test-'))
+  // A decision file can be seeded, so the remote path can be tested without
+  // driving the admin API (which is local-only by design).
+  if (seed) {
+    fs.writeFileSync(path.join(home, 'lan-gate-state.json'), JSON.stringify({ decisions: seed }, null, 2), 'utf8')
+  }
   const child = spawn(process.execPath, [GATEWAY], {
     env: {
       ...process.env,
       DSH_HOME: home,
       LAN_GATE_PORT: String(port),
       LAN_GATE_TARGET_HOST: '127.0.0.1',
-      LAN_GATE_TARGET_PORT: String(targetPort)
+      LAN_GATE_TARGET_PORT: String(targetPort),
+      ...(extraEnv || {})
     },
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -79,12 +88,12 @@ function startGateway(port, targetPort) {
  * Boot a mock DSH upstream plus the real gateway on free ports, hand both to
  * the test body, and tear everything down afterwards.
  */
-async function withGateway(fn) {
+async function withGateway(fn, extraEnv, seed) {
   const targetPort = await freePort()
   const gatewayPort = await freePort()
   const target = startMockTarget()
   await new Promise((r) => target.listen(targetPort, '127.0.0.1', r))
-  const gw = startGateway(gatewayPort, targetPort)
+  const gw = startGateway(gatewayPort, targetPort, extraEnv, seed)
   await gw.ready
   try {
     await fn({ port: gatewayPort, targetPort, gw })
@@ -114,10 +123,31 @@ function get(port, urlPath) {
   })
 }
 
-function post(port, urlPath, payload) {
+/** Same as get(), but sends a cookie back — that is how a browser is modelled. */
+function getWithCookie(port, urlPath, cookie) {
+  return new Promise((resolve, reject) => {
+    const headers = cookie ? { cookie } : {}
+    http.get({ host: '127.0.0.1', port: port, path: urlPath, headers }, (res) => {
+      let body = ''
+      res.on('data', (c) => { body += c })
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }))
+    }).on('error', reject)
+  })
+}
+
+function tokenCookie(res) {
+  const raw = res.headers['set-cookie'] || []
+  const hit = raw.find((c) => c.startsWith('lg_token='))
+  if (!hit) return undefined
+  return hit.split(';')[0]
+}
+
+function post(port, urlPath, payload, cookie) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload)
-    const req = http.request({ host: '127.0.0.1', port: port, path: urlPath, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } }, (res) => {
+    const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    if (cookie) headers.cookie = cookie
+    const req = http.request({ host: '127.0.0.1', port: port, path: urlPath, method: 'POST', headers }, (res) => {
       let body = ''
       res.on('data', (c) => { body += c })
       res.on('end', () => resolve({ status: res.statusCode, body }))
@@ -390,4 +420,137 @@ test('push: VAPID authorization header is a well-formed ES256 JWT', async () => 
   const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
   assert.strictEqual(claims.aud, 'https://push.example.test')
   assert.ok(claims.exp > Math.floor(Date.now() / 1000), 'token is not expired')
+})
+
+// ---- approval binds an address, a token binds a browser ---------------------
+
+test('auth: an approval binds an address, a token binds a browser', () => {
+  const auth = require('../lib/lan-gate-auth.cjs')
+  const decisions = {}
+
+  // Never approved.
+  assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined).action, 'pending')
+
+  // Denied.
+  auth.denyDevice(decisions, '1.2.3.4')
+  assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined).action, 'denied')
+
+  // Approved.
+  auth.approveDevice(decisions, '1.2.3.4', 'phone')
+  const first = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined)
+  assert.strictEqual(first.action, 'issue')
+  assert.ok(first.token.length >= 16, 'a token is minted for the browser')
+
+  // The gateway stores the minted token on the device.
+  const grant = (token) => { decisions['1.2.3.4'].tokens = auth.tokenList(decisions['1.2.3.4']).concat([token]) }
+  grant(first.token)
+
+  // The browser that holds that token is let through.
+  assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', first.token, undefined).action, 'forward')
+
+  // A second browser of the same address gets its own token instead of a wall.
+  const second = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined)
+  assert.strictEqual(second.action, 'issue')
+  assert.notStrictEqual(second.token, first.token, 'each browser holds its own token')
+  grant(second.token)
+  assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', second.token, undefined).action, 'forward')
+
+  // A ticket that belongs to the device is accepted back.
+  assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', undefined, first.token).action, 'ticket')
+
+  // A token from another device is not.
+  assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', 'f'.repeat(32), undefined).action, 'issue')
+})
+
+test('auth: a revoked device falls back to the approval wall', () => {
+  const auth = require('../lib/lan-gate-auth.cjs')
+  const decisions = {}
+  auth.approveDevice(decisions, '1.2.3.4', 'phone')
+  const token = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined).token
+  auth.revokeDevice(decisions, '1.2.3.4')
+  assert.strictEqual(auth.resolveRemote(decisions, '1.2.3.4', token, undefined).action, 'pending')
+  assert.strictEqual(auth.tokenList(decisions['1.2.3.4']).length, 0, 'revoking drops the tokens')
+})
+
+test('auth: the browser cap per device is enforced', () => {
+  const auth = require('../lib/lan-gate-auth.cjs')
+  const decisions = {}
+  auth.approveDevice(decisions, '1.2.3.4', 'phone')
+  for (let i = 0; i < auth.MAX_TOKENS_PER_DEVICE; i++) {
+    decisions['1.2.3.4'].tokens.push(auth.randomToken())
+  }
+  const verdict = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined)
+  assert.strictEqual(verdict.action, 'too-many')
+  assert.strictEqual(verdict.count, auth.MAX_TOKENS_PER_DEVICE)
+})
+
+test('auth: a state file written by the single-token gateway keeps the signed-in browser', () => {
+  const auth = require('../lib/lan-gate-auth.cjs')
+  const legacyToken = 'a'.repeat(32)
+  const d = auth.normalizeDecision({ ip: '1.2.3.4', allow: true, token: legacyToken, issued: true })
+  assert.deepStrictEqual(d.tokens, [legacyToken])
+  assert.strictEqual(d.token, undefined, 'the single-token field is gone')
+  assert.strictEqual(d.issued, undefined, 'the issued flag is gone')
+  assert.strictEqual(auth.hasToken(d, legacyToken), true, 'the existing browser stays signed in')
+})
+
+test('auth: changing the device kind keeps the browsers signed in', () => {
+  const auth = require('../lib/lan-gate-auth.cjs')
+  const decisions = {}
+  auth.approveDevice(decisions, '1.2.3.4', 'auto')
+  const token = auth.resolveRemote(decisions, '1.2.3.4', undefined, undefined).token
+  decisions['1.2.3.4'].tokens = [token]
+  auth.approveDevice(decisions, '1.2.3.4', 'phone', true)
+  assert.strictEqual(auth.hasToken(decisions['1.2.3.4'], token), true, 'the browser keeps its token')
+  assert.strictEqual(decisions['1.2.3.4'].kind, 'phone', 'the kind is updated')
+})
+
+test('gateway: two browsers behind one address are both let in', async () => {
+  // A phone and a laptop behind the same NAT share one public address. The
+  // single-token gateway locked the second one out with "需要重新授权".
+  const remote = '203.0.113.7'
+  await withGateway(async ({ port }) => {
+    const approved = await post(port, '/lan-gate/action', { action: 'approve', ip: remote, kind: 'phone' })
+    assert.strictEqual(approved.status, 200)
+
+    // Browser A shows up without a cookie.
+    const a = await getWithCookie(port, '/', null)
+    assert.strictEqual(a.status, 302, 'the browser is redirected to pick up its token')
+    const cookieA = tokenCookie(a)
+    assert.ok(cookieA, 'a token cookie is issued')
+    assert.strictEqual(a.headers.location, '/', 'the redirect does not leak the token in the URL')
+
+    // Browser A now has its token and reaches the app.
+    const aPage = await getWithCookie(port, '/', cookieA)
+    assert.strictEqual(aPage.status, 200, 'the signed-in browser reaches DSH')
+    assert.ok(aPage.body.includes('data-lan-device'), 'the phone styling is injected')
+
+    // Browser B, same address, no cookie: it must get its own token.
+    const b = await getWithCookie(port, '/', null)
+    assert.strictEqual(b.status, 302, 'the second browser is not locked out')
+    const cookieB = tokenCookie(b)
+    assert.ok(cookieB, 'the second browser gets a token too')
+    assert.notStrictEqual(cookieB, cookieA, 'the two browsers hold different tokens')
+
+    const bPage = await getWithCookie(port, '/', cookieB)
+    assert.strictEqual(bPage.status, 200, 'the second browser reaches DSH as well')
+    assert.ok(!bPage.body.includes('需要重新授权'), 'the lock-out wall is gone')
+  }, { LAN_GATE_TEST_CLIENT_IP: remote })
+})
+
+test('gateway: an approved device can raise the agent-done push itself', async () => {
+  const remote = '203.0.113.9'
+  const seed = { [remote]: { ip: remote, allow: true, at: Date.now(), revoked: false, kind: 'phone', tokens: [] } }
+  await withGateway(async ({ port }) => {
+    const first = await getWithCookie(port, '/', null)
+    assert.strictEqual(first.status, 302)
+    const cookie = tokenCookie(first)
+    assert.ok(cookie, 'the browser holds a token')
+
+    const allowed = await post(port, '/pwa/push/send', { title: 'DSH 任务完成', body: '智能体已完成当前步骤。' }, cookie)
+    assert.strictEqual(allowed.status, 200, 'the approved device may raise the notification')
+
+    const refused = await post(port, '/pwa/push/send', { title: 'x', body: 'y' })
+    assert.strictEqual(refused.status, 403, 'a caller without a token may not')
+  }, { LAN_GATE_TEST_CLIENT_IP: remote, LAN_GATE_TEST_REMOTE: '1' }, seed)
 })
