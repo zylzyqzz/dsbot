@@ -503,22 +503,31 @@ html[data-dsh-lan-drawer="on"] .bt-tile .bt-mark > svg {
   flex: none !important;
 }
 
-/* The preview line under a bot name is a whole message. In a 225px drawer it
-   either wraps to three lines or pushes the name out of view, so it is capped
-   at 8 characters with an ellipsis: enough to recognise the thread, never
-   enough to break the row's rhythm.
-   The row is `button.bt-tile > span.bt-mark + <text column>`; the preview is
-   the second line inside that column. */
-html[data-dsh-lan-drawer="on"] .bt-tile > span.bt-mark ~ div > *:nth-child(2),
-html[data-dsh-lan-drawer="on"] .bt-tile > span.bt-mark ~ span:not(.bt-mark) {
-  display: block !important;
-  max-width: 8.6em !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+/* The bot list is a switcher, not a reader: it shows the avatar and the name,
+   nothing else. A conversation row renders `bt-row-name` + `bt-row-title` +
+   `bt-row-preview`; the preview is the last message, which in a 225px drawer
+   crowds out the name it belongs to. Only the preview is dropped — the name
+   and the role chip stay. */
+html[data-dsh-lan-drawer="on"] .bt-row-preview {
+  display: none !important;
 }
 
-/* One line only, whatever the message was. */
+/* With the preview gone the row keeps a single line, vertically centred
+   against its avatar. */
+html[data-dsh-lan-drawer="on"] .bt-row-body {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-row {
+  min-height: 60px !important;
+  align-items: center !important;
+  overflow: hidden !important;
+}
+
+/* A tile is the same idea: name and chip, no message body. */
 html[data-dsh-lan-drawer="on"] .bt-tile {
   overflow: hidden !important;
 }
@@ -845,8 +854,8 @@ html[data-dsh-lan-drawer="on"] [data-slot="sidebar.footer.action"] > * {
    right edge, no magic offsets. */
 html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button {
   position: fixed;
-  right: 12px;
-  left: auto;
+  left: 12px;
+  right: auto;
   bottom: calc(12px + max(env(safe-area-inset-bottom), 0px));
   z-index: 6;
   width: 40px !important;
