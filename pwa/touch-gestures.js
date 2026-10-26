@@ -1,4 +1,4 @@
-/* dsh-mobile-pwa · touch gestures
+/* dsbot · touch gestures
  * Touch-first gestures for the DSH Web UI on phones:
  *   - Pull-to-refresh on the conversation view
  *   - Edge-swipe back navigation

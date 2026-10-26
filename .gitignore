@@ -7,3 +7,7 @@ test/.tmp/
 # never commit a git credential helper store
 gitcreds*
 *gitcreds*
+# The project state folder carries deployment details (addresses, paths,
+# service names). It stays on the machine that works on the project and out
+# of the published package and the public repository.
+.ai/

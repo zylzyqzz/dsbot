@@ -1,4 +1,4 @@
-/* dsh-mobile-pwa · mobile touch-first CSS (DeepSeek Harness 0.2.x)
+/* dsbot · mobile touch-first CSS (DeepSeek Harness 0.2.x)
  *
  * Desktop is never affected: every rule is scoped under
  * html[data-lan-device="phone"], or under the narrow-viewport fallback that
@@ -934,6 +934,68 @@ html[data-dsh-lan-drawer="on"] .hHd-Xa_footArea {
   padding-top: 0 !important;
 }
 
+/* ---- the drawer's Muse group -------------------------------------------
+   Muse keeps its destinations in the drawer: a small group label and a short
+   list of rows. The connector list and the permission page are the shell's
+   own pages, so they sit there in the same register, above the gear and
+   clear of the safe area. */
+html[data-dsh-lan-drawer="on"] .dsh-lan-muse {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(60px + max(env(safe-area-inset-bottom), 0px));
+  padding: 0 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-muse > * {
+  pointer-events: auto;
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-muse-label {
+  padding: 6px 10px 4px;
+  font: 500 12px/1.4 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--dsw-alias-text-secondary, #8a8a8e);
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-muse-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dsw-alias-text-primary, #1c1c1e);
+  font: 500 14.5px/1 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-muse-row:active {
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #1c1c1e) 7%, transparent);
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-muse-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--dsw-alias-text-secondary, #8a8a8e);
+}
+
+html[data-dsh-lan-drawer="on"] .dsh-lan-muse-ico svg {
+  width: 20px;
+  height: 20px;
+}
+
 html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button > * {
   display: none !important;
 }
@@ -998,3 +1060,359 @@ html[data-dsh-lan-drawer="on"] .bt-account-menu > button:last-of-type {
      would beat that rule and squeeze the page area to a third of the screen,
      so the shell is left alone. */
 }
+
+/* =====================================================================
+ * Muse shell.
+ *
+ * The Muse app (com.facebook.aura) is a phone shell around an agent, and
+ * three of its surfaces carry the idea: the connector list (what the agent
+ * can reach), the permission page (how much it may do without stopping) and
+ * the floating agent pill (the agent's identity over the conversation).
+ *
+ * The geometry here is Muse's: one full-screen page per surface, a segmented
+ * control, borderless cards with hairline rows, and a text-only action on the
+ * right of each row. The colours come from the DSH theme tokens so the shell
+ * follows the user's own light/dark choice instead of shipping a second
+ * palette.
+ * ===================================================================== */
+
+:root {
+  --muse-accent: #4c8dff;
+  --muse-surface: var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-base, #ffffff));
+  --muse-page: var(--dsw-alias-bg-base, #f2f2f7);
+  --muse-ink: var(--dsw-alias-text-primary, #1c1c1e);
+  --muse-ink-soft: var(--dsw-alias-text-secondary, #8a8a8e);
+  --muse-hairline: var(--dsw-alias-border-l2, rgba(0, 0, 0, .1));
+}
+
+/* ---- the sheet -------------------------------------------------------- */
+
+.muse-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  background: var(--muse-page);
+  color: var(--muse-ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.muse-sheet-head {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 8px;
+  padding-top: max(env(safe-area-inset-top), 0px);
+  height: calc(52px + max(env(safe-area-inset-top), 0px));
+  background: var(--muse-page);
+}
+
+.muse-sheet-back {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muse-accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.muse-sheet-back:active {
+  background: color-mix(in srgb, var(--muse-ink) 8%, transparent);
+}
+
+.muse-sheet-title {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  margin: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muse-sheet-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 16px calc(40px + max(env(safe-area-inset-bottom), 0px));
+}
+
+/* ---- segmented control ------------------------------------------------ */
+
+.muse-seg {
+  display: flex;
+  gap: 2px;
+  margin: 6px 0 14px;
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--muse-ink) 6%, transparent);
+}
+
+.muse-seg-item {
+  flex: 1 1 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muse-ink-soft);
+  font: 500 14px/1 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.muse-seg-item[aria-selected="true"] {
+  background: var(--muse-surface);
+  color: var(--muse-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+}
+
+.muse-seg-count {
+  font-size: 12px;
+  color: var(--muse-ink-soft);
+}
+
+/* ---- cards and rows --------------------------------------------------- */
+
+.muse-card {
+  border-radius: 16px;
+  background: var(--muse-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+  overflow: hidden;
+}
+
+.muse-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-top: 1px solid var(--muse-hairline);
+  min-height: 56px;
+}
+
+.muse-row:first-child {
+  border-top: 0;
+}
+
+.muse-row-mark {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--muse-ink) 7%, transparent);
+  color: var(--muse-ink-soft);
+  font: 700 13px/1 system-ui, -apple-system, sans-serif;
+}
+
+.muse-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.muse-row-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--muse-ink);
+}
+
+.muse-row-sub {
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muse-ink-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.muse-row-action {
+  flex: none;
+  min-height: 44px;
+  padding: 0 2px 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--muse-accent);
+  font: 600 15px/1 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.muse-row-action:disabled {
+  color: var(--muse-ink-soft);
+  cursor: default;
+}
+
+.muse-row-action.is-locked {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.muse-row-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muse-accent);
+}
+
+.muse-row-check svg {
+  width: 20px;
+  height: 20px;
+}
+
+.muse-section-label {
+  margin: 10px 4px 8px;
+  font-size: 13px;
+  color: var(--muse-ink-soft);
+}
+
+.muse-note,
+.muse-empty {
+  margin: 12px 4px 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muse-ink-soft);
+}
+
+.muse-empty {
+  text-align: center;
+  margin: 40px 0;
+  font-size: 14px;
+}
+
+.muse-error {
+  margin: 12px 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5484d) 10%, transparent);
+  color: var(--dsw-alias-state-error-primary, #e5484d);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---- the floating agent ----------------------------------------------- */
+
+.muse-pill {
+  position: fixed;
+  top: calc(max(env(safe-area-inset-top), 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147482990;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  max-width: 76vw;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muse-surface) 88%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .16);
+  color: var(--muse-ink);
+  font: 600 13px/1 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.muse-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--muse-ink-soft);
+  flex: none;
+}
+
+.muse-pill.is-running .muse-pill-dot {
+  background: var(--muse-accent);
+  animation: muse-pill-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes muse-pill-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.78); }
+}
+
+.muse-pill-name {
+  flex: none;
+}
+
+.muse-pill-tool {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muse-ink-soft);
+  font-weight: 500;
+}
+
+.muse-pill:not(.has-tool) .muse-pill-tool {
+  display: none;
+}
+
+/* ---- produced artifacts ------------------------------------------------ */
+
+.muse-artifact {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.muse-artifact > img {
+  max-width: 100%;
+  height: auto;
+}
+
+.muse-artifact-dl {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .58);
+  color: #fff;
+  text-decoration: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.muse-artifact-dl svg {
+  width: 17px;
+  height: 17px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .muse-pill.is-running .muse-pill-dot { animation: none; }
+}
+

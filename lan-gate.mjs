@@ -1,4 +1,4 @@
-// dsh-mobile-pwa — Cordis plugin entry (DeepSeek Harness 0.2.x)
+// dsbot — Cordis plugin entry (DeepSeek Harness 0.2.x)
 //
 // Spawns the enhanced LAN/remote PWA gateway (lib/lan-gate-server.cjs) as an
 // isolated child process, reverse-proxying the local DSH Web UI with:
@@ -23,7 +23,7 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
-export const name = 'dsh-mobile-pwa'
+export const name = 'dsbot'
 export const inject = ['subprocess']
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -157,13 +157,13 @@ export function apply(ctx) {
       })
 
       handle.done.then((outcome) => {
-        console.log(`[dsh-mobile-pwa] gateway exited code=${outcome.exitCode} signal=${outcome.signal}`)
+        console.log(`[dsbot] gateway exited code=${outcome.exitCode} signal=${outcome.signal}`)
       }).catch((err) => {
-        console.error(`[dsh-mobile-pwa] spawn failed: ${String((err && err.message) || err)}`)
+        console.error(`[dsbot] spawn failed: ${String((err && err.message) || err)}`)
       })
 
       console.log(
-        `[dsh-mobile-pwa] gateway starting -> ${target.host}:${target.port} (${target.source})` +
+        `[dsbot] gateway starting -> ${target.host}:${target.port} (${target.source})` +
         (token ? ' · dsh session bootstrap armed' : ' · dsh session bootstrap unavailable')
       )
 
@@ -171,17 +171,17 @@ export function apply(ctx) {
         const out = handle && handle.collected && handle.collected.stdout
         if (out) {
           const read = out.readFrom(0)
-          if (read && read.text) console.log(`[dsh-mobile-pwa] ${read.text.trim()}`)
+          if (read && read.text) console.log(`[dsbot] ${read.text.trim()}`)
         }
         const err = handle && handle.collected && handle.collected.stderr
         if (err) {
           const eread = err.readFrom(0)
-          if (eread && eread.text) console.error(`[dsh-mobile-pwa] stderr: ${eread.text.trim()}`)
+          if (eread && eread.text) console.error(`[dsbot] stderr: ${eread.text.trim()}`)
         }
       }
       reportTimer = setTimeout(report, 1500)
     } catch (err) {
-      console.error(`[dsh-mobile-pwa] ${String((err && err.message) || err)}`)
+      console.error(`[dsbot] ${String((err && err.message) || err)}`)
     }
   }
 

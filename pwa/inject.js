@@ -1,4 +1,4 @@
-/* dsh-mobile-pwa · PWA bootstrap (injected into the DSH page)
+/* dsbot · PWA bootstrap (injected into the DSH page)
  *
  * Registers the service worker (offline cache + push), loads the touch
  * gestures on phone devices, and watches the DSH 0.2 conversation DOM for the
@@ -109,7 +109,7 @@
       navigator.serviceWorker.register('/pwa/sw.js', { scope: '/' }).then(function (reg) {
         PWA.reg = reg
       }).catch(function (err) {
-        console.warn('[dsh-pwa] SW registration failed:', err)
+        console.warn('[dsbot] SW registration failed:', err)
       })
     })
     swReady = navigator.serviceWorker.ready.catch(function () { return null })
@@ -197,6 +197,7 @@
     scrim: null,
     menu: null,
     bar: null,
+    museNav: null,
     observer: null,
     toggleEl: null,
     toggleKeys: '',
@@ -218,6 +219,8 @@
     compose: '<svg ' + ICON_ATTR + '><path d="M13.5 3.5H7a2.5 2.5 0 0 0-2.5 2.5v12A2.5 2.5 0 0 0 7 20.5h10a2.5 2.5 0 0 0 2.5-2.5v-6.5"/><path d="M16.5 3.2a2.1 2.1 0 0 1 3 3L12 13.7l-3.6.9.9-3.6z"/></svg>',
     // grid: four rounded squares of unequal weight
     grid: '<svg ' + ICON_ATTR + '><rect x="3.6" y="3.6" width="7" height="7" rx="2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2"/></svg>',
+    // shield: the permission page — a shield with a check inside
+    shield: '<svg ' + ICON_ATTR + '><path d="M12 3.5 5 6.2v5.4c0 4.3 2.9 8.2 7 9.4 4.1-1.2 7-5.1 7-9.4V6.2z"/><path d="M9.2 12.1l2 2 3.6-4"/></svg>',
     // zap: automation
     zap: '<svg ' + ICON_ATTR + '><path d="M13.5 2.5 4 14h7l-.5 7.5L20 10h-7z"/></svg>',
     // gear: settings — a ring plus six teeth, not a sunburst
@@ -423,6 +426,42 @@
     return bar
   }
 
+  // The drawer's own navigation for the shell's pages.
+  //
+  // Muse keeps its tabs in the drawer, not in a toolbar: a group label and a
+  // short list of destinations. The connector list and the permission page
+  // have no stock phone surface in DSH, so the drawer carries them in Muse's
+  // register, right above the gear.
+  function chromeBuildMuseNav() {
+    var nav = document.createElement('nav')
+    nav.className = 'dsh-lan-muse'
+    nav.setAttribute('aria-label', '智能体')
+    var label = document.createElement('div')
+    label.className = 'dsh-lan-muse-label'
+    label.textContent = '智能体'
+    nav.appendChild(label)
+    var rows = [
+      { icon: 'grid', label: '连接器', page: 'connectors' },
+      { icon: 'shield', label: '权限', page: 'permissions' }
+    ]
+    rows.forEach(function (row) {
+      var button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'dsh-lan-muse-row'
+      button.innerHTML = '<span class="dsh-lan-muse-ico">' + ICONS[row.icon] + '</span><span>' + row.label + '</span>'
+      button.addEventListener('click', function () {
+        var muse = window.__DSH_MUSE__
+        if (!muse || typeof muse.open !== 'function') return
+        // The drawer steps aside for the page, the way it does for a
+        // conversation row.
+        chromeExemptClose()
+        muse.open(row.page)
+      })
+      nav.appendChild(button)
+    })
+    return nav
+  }
+
   function chromeEnsureElements() {
     if (!chromeState.scrim) {
       var scrim = document.createElement('div')
@@ -448,6 +487,12 @@
     if (!chromeState.bar) {
       chromeState.bar = chromeBuildBar()
     }
+    // The drawer's own navigation for the shell's pages. It is part of the
+    // column, so it has to live in the column and not in the body.
+    if (!chromeState.museNav && chromeState.col) {
+      chromeState.museNav = chromeBuildMuseNav()
+      chromeState.col.appendChild(chromeState.museNav)
+    }
     // No footer row: every destination already lives in the settings pages,
     // so the drawer carries one control (the gear) and no duplicate doors.
   }
@@ -461,6 +506,10 @@
       chromeState.col.classList.remove('dsh-lan-sidebar-col')
     }
     if (chromeState.observer) { chromeState.observer.disconnect(); chromeState.observer = null }
+    if (chromeState.museNav && chromeState.museNav.parentNode) {
+      chromeState.museNav.parentNode.removeChild(chromeState.museNav)
+    }
+    chromeState.museNav = null
     chromeState.ready = false
     chromeState.frame = null
     chromeState.col = null
@@ -540,6 +589,22 @@
     if (event.key === 'Escape' && chromeState.ready) chromeDrawerClose()
   })
 
+  // ---- Load the Muse shell ----------------------------------------------
+  // The shell needs the typed-RPC client first, so the two files are loaded in
+  // order: the shell reads window.__DSH_RPC__ when it boots.
+  function loadPwaScript(src, then) {
+    var script = document.createElement('script')
+    script.src = src
+    script.async = false
+    script.onload = function () { if (then) then() }
+    script.onerror = function () { console.warn('[dsbot] could not load ' + src) }
+    document.head.appendChild(script)
+  }
+
+  loadPwaScript('/pwa/dsh-rpc.js', function () {
+    loadPwaScript('/pwa/muse-shell.js')
+  })
+
   // ---- Agent-done detection ---------------------------------------------
   // DSH renders [data-chat-running] while the agent works. When it disappears
   // the turn is over: raise a local notification and tell the gateway, so any
@@ -556,7 +621,7 @@
     if (now - lastNotifiedAt < 3000) return
     lastNotifiedAt = now
 
-    var title = 'DSH 任务完成'
+    var title = 'DSBot 任务完成'
     var body = '智能体已完成当前步骤。'
 
     try {
@@ -635,7 +700,7 @@
         localStorage.setItem('dsh-pwa-notif-hint', '1')
         try {
           Notification.requestPermission().then(function (state) {
-            if (state === 'granted') subscribe().catch(function (err) { console.warn('[dsh-pwa] push subscribe failed:', err) })
+            if (state === 'granted') subscribe().catch(function (err) { console.warn('[dsbot] push subscribe failed:', err) })
           })
         } catch (err) { /* ignore */ }
         toast.remove()

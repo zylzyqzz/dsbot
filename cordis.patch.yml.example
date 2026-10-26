@@ -1,4 +1,4 @@
-# dsh-mobile-pwa — static mount example
+# dsbot — static mount example
 #
 # Copy this block into your DSH profile patch to mount without `dsh plugin add`.
 # Replace <ABSOLUTE_PATH> with the checkout directory of this project.
@@ -8,9 +8,9 @@
 # DSH 0.2 note: a patch replaces the matched row's whole `config`, so restate
 # every key the row needs if you extend it.
 - insert:
-    - id: dsh-mobile-pwa
-      name: dsh-mobile-pwa
-      path: file:///ABSOLUTE_PATH/dsh-mobile-pwa/lan-gate.mjs
+    - id: dsbot
+      name: '@zylzyqzz/dsbot'
+      path: file:///ABSOLUTE_PATH/dsbot/lan-gate.mjs
 
 # The public authority the gateway serves must be trusted by DSH's Host/Origin
 # fence, because the gateway forwards the browser-facing Host unchanged.

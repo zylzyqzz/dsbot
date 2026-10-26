@@ -1,4 +1,4 @@
-/* dsh-mobile-pwa — browser setup contract test
+/* dsbot — browser setup contract test
  *
  * Covers the parts of scripts/ that are pure logic, so a regression in the
  * installer or the proxy shim is caught without a server, a network, or a real

@@ -4,7 +4,7 @@ This file helps AI coding agents and LLM tooling understand and work in this rep
 
 ## What this repo is
 
-`dsh-mobile-pwa` is a **Cordis bundle plugin for DeepSeek Harness (DSH) 0.2.x** that turns
+`dsbot` is a **Cordis bundle plugin for DeepSeek Harness (DSH) 0.2.x** that turns
 the DSH Web UI into a complete mobile **PWA**. It runs a **standalone Node gateway child
 process** that securely exposes the local DSH Web UI to remote phones, and injects PWA
 capability (manifest, service worker, touch layout, gestures, agent-done notification)

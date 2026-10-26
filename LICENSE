@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 dsh-mobile-pwa contributors
+Copyright (c) 2026 dsbot contributors
 Copyright (c) 2026 Bernardxu123 — original dsh-mobile-gate gateway (base for lib/lan-gate-server.cjs)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,7 +24,7 @@ SOFTWARE.
 ---
 
 NOTICE: This project is a derivative of `dsh-mobile-gate` (MIT). The gateway
-`lib/lan-gate-server.cjs` is based on the original, extended by dsh-mobile-pwa
+`lib/lan-gate-server.cjs` is based on the original, extended by dsbot
 with PWA support (manifest injection, service-worker registration, touch
 gestures, agent-done notifications, offline caching). Original license and
 copyright retained above.

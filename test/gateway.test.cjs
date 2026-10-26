@@ -1,4 +1,4 @@
-/* dsh-mobile-pwa · gateway + push smoke test
+/* dsbot · gateway + push smoke test
  *
  * Boots the real lib/lan-gate-server.cjs behind a mock DSH upstream and verifies:
  *   1. gateway serves /pwa/* assets (manifest, sw.js)
@@ -57,7 +57,7 @@ function startMockTarget() {
 }
 
 function startGateway(port, targetPort, extraEnv, seed) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-mobile-pwa-test-'))
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dsbot-test-'))
   // A decision file can be seeded, so the remote path can be tested without
   // driving the admin API (which is local-only by design).
   if (seed) {
@@ -78,7 +78,7 @@ function startGateway(port, targetPort, extraEnv, seed) {
   child.stdout.on('data', (d) => { out += d })
   child.stderr.on('data', (d) => { err += d })
   const ready = new Promise((resolve) => {
-    const t = setInterval(() => { if (out.includes('[lan-gate] listening on')) { clearInterval(t); resolve() } }, 40)
+    const t = setInterval(() => { if (out.includes('[dsbot] listening on')) { clearInterval(t); resolve() } }, 40)
     setTimeout(() => { clearInterval(t); resolve() }, 5000)
   })
   return { child, ready, logs: () => out + err, home }
@@ -209,7 +209,7 @@ test('gateway: serves PWA assets (/pwa/manifest.json, /pwa/sw.js)', async () => 
 
     const sw = await get(port, '/pwa/sw.js')
     assert.strictEqual(sw.status, 200)
-    assert.ok(sw.body.includes('dsh-mobile-pwa'))
+    assert.ok(sw.body.includes('dsbot'))
     // The worker lives under /pwa/ but has to claim the whole origin.
     assert.strictEqual(sw.headers['service-worker-allowed'], '/',
       'sw.js is allowed to claim the root scope')
@@ -363,7 +363,7 @@ test('push: payload encryption round-trips (RFC 8291 aes128gcm, RFC 8188 framing
     keys: { p256dh: b64u(uaPublic), auth: b64u(crypto.randomBytes(16)) }
   }
 
-  const payload = { title: 'DSH 任务完成', body: '智能体已完成当前步骤。' }
+  const payload = { title: 'DSBot 任务完成', body: '智能体已完成当前步骤。' }
   const sealed = await webPush.encryptPayload(subscription, payload)
   assert.strictEqual(sealed.headers['Content-Encoding'], 'aes128gcm')
 
@@ -417,7 +417,7 @@ test('gateway: forwards the browser-facing Host unchanged (DSH 0.2 Host fence)',
   await gw.ready
   try {
     await new Promise((resolve, reject) => {
-      const req = http.request({ host: '127.0.0.1', port: gatewayPort, path: '/', headers: { host: '111.170.171.25:3088' } }, (res) => {
+      const req = http.request({ host: '127.0.0.1', port: gatewayPort, path: '/', headers: { host: '203.0.113.10:3088' } }, (res) => {
         res.resume()
         res.on('end', resolve)
       })
@@ -425,7 +425,7 @@ test('gateway: forwards the browser-facing Host unchanged (DSH 0.2 Host fence)',
       req.end()
     })
     assert.strictEqual(seen.length, 1)
-    assert.strictEqual(seen[0].host, '111.170.171.25:3088', 'upstream sees the browser host')
+    assert.strictEqual(seen[0].host, '203.0.113.10:3088', 'upstream sees the browser host')
   } finally {
     gw.child.kill('SIGTERM')
     await new Promise((r) => target.close(r))
@@ -451,7 +451,7 @@ test('gateway: mints the DSH browser session cookie with the launch token', asyn
   const targetPort = await freePort()
   const gatewayPort = await freePort()
   await new Promise((r) => target.listen(targetPort, '127.0.0.1', r))
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-mobile-pwa-test-'))
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dsbot-test-'))
   const child = spawn(process.execPath, [GATEWAY], {
     env: {
       ...process.env,
@@ -466,7 +466,7 @@ test('gateway: mints the DSH browser session cookie with the launch token', asyn
   let out = ''
   child.stdout.on('data', (d) => { out += d })
   await new Promise((resolve) => {
-    const t = setInterval(() => { if (out.includes('[lan-gate] listening on')) { clearInterval(t); resolve() } }, 40)
+    const t = setInterval(() => { if (out.includes('[dsbot] listening on')) { clearInterval(t); resolve() } }, 40)
     setTimeout(() => { clearInterval(t); resolve() }, 5000)
   })
   try {
@@ -634,7 +634,7 @@ test('gateway: an approved device can raise the agent-done push itself', async (
     const cookie = tokenCookie(first)
     assert.ok(cookie, 'the browser holds a token')
 
-    const allowed = await post(port, '/pwa/push/send', { title: 'DSH 任务完成', body: '智能体已完成当前步骤。' }, cookie)
+    const allowed = await post(port, '/pwa/push/send', { title: 'DSBot 任务完成', body: '智能体已完成当前步骤。' }, cookie)
     assert.strictEqual(allowed.status, 200, 'the approved device may raise the notification')
 
     const refused = await post(port, '/pwa/push/send', { title: 'x', body: 'y' })

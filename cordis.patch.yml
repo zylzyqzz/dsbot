@@ -1,12 +1,12 @@
-# dsh-mobile-pwa — bundle patch layer
+# dsbot — bundle patch layer
 #
 # Applied when a profile lists this package in dsh.profile.bundles
-# (installed via `dsh plugin --profile web add dsh-mobile-pwa`).
+# (installed via `dsh plugin --profile web add @zylzyqzz/dsbot`).
 # The row references the package by name; Node resolution finds
 # lan-gate.mjs inside the installed package.
 - insert:
-    - id: dsh-mobile-pwa
-      name: dsh-mobile-pwa
+    - id: dsbot
+      name: '@zylzyqzz/dsbot'
 
 # DSH 0.2 authenticates a browser with a signed session cookie that is bound to
 # the request's Host authority, and its Host/Origin fence compares that Host
@@ -15,7 +15,7 @@
 # gateway serves has to be trusted.
 #
 # LAN_GATE_TRUSTED_HOSTS is a comma-separated list of authorities, for example
-# "111.170.171.25,app.example". A port-less entry matches any port. The row
+# "203.0.113.10,app.example". A port-less entry matches any port. The row
 # only restates the upstream `connection` row's single `trustedHosts` key and
 # appends to the invocation's own list, so `--trusted-host` keeps working.
 - id: connection

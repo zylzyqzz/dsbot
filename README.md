@@ -1,13 +1,13 @@
-# dsh-mobile-pwa · 让 DeepSeek Harness 在手机上变成真 PWA
+# DSBot · 让 DeepSeek Harness 在手机上变成真 PWA
 
 > 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）变成**手机上的完整 PWA**：安全远程访问你的自建 DSH + 一键「添加到主屏」成独立 App + 离线可用 + 触屏手势 + 任务完成通知。
 
 基于 MIT 的 [`dsh-mobile-gate`](https://github.com/Bernardxu123/dsh-mobile-gate)（安全网关基座）做差异化增强。
 
-**当前版本 `0.2.0` —— 对齐 DSH 官方 `0.2.x`**（`engines.dsh: ">=0.2.0 <0.3.0"`）。
+**当前版本 `0.3.0` —— 对齐 DSH 官方 `0.2.x`**（`engines.dsh: ">=0.2.0 <0.3.0"`）。
 
-[![npm version](https://img.shields.io/npm/v/dsh-mobile-pwa)](https://www.npmjs.com/package/dsh-mobile-pwa)
-[![license](https://img.shields.io/github/license/zylzyqzz/dsh-mobile-pwa)](https://github.com/zylzyqzz/dsh-mobile-pwa/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/%40zylzyqzz%2Fdsbot)](https://www.npmjs.com/package/@zylzyqzz/dsbot)
+[![license](https://img.shields.io/github/license/zylzyqzz/dsbot)](https://github.com/zylzyqzz/dsbot/blob/main/LICENSE)
 [![dsh-plugin](https://img.shields.io/badge/dsh--plugin-ready-4c8dff)](https://github.com/topics/dsh-plugin)
 
 📍 生态定位：社区现有移动端方案都停留在「窄屏 CSS 微调」，本项目做的是**移动端 PWA 一站式完整方案**。
@@ -55,19 +55,19 @@
 ### 方式零：npm 一键安装（推荐，已发布）
 
 ```bash
-npm add dsh-mobile-pwa@0.2.0
-dsh plugin --profile web add dsh-mobile-pwa
+npm add @zylzyqzz/dsbot@0.3.0
+dsh plugin --profile web add @zylzyqzz/dsbot
 ```
 
 > 已声明 `dsh.bundle` manifest，安装后自动激活配置层，无需手写 patch。
-> 包：https://www.npmjs.com/package/dsh-mobile-pwa
+> 包：https://www.npmjs.com/package/@zylzyqzz/dsbot
 
 ### 方式一：从 GitHub 本地安装
 
 ```bash
-git clone https://github.com/zylzyqzz/dsh-mobile-pwa.git
-cd dsh-mobile-pwa
-dsh plugin --profile web add ./dsh-mobile-pwa
+git clone https://github.com/zylzyqzz/dsbot.git
+cd dsbot
+dsh plugin --profile web add ./dsbot
 ```
 
 > 源码安装需要给 pnpm 放行构建脚本（见官方 `publish` 文档的 allowBuilds 说明）。本包是纯 JS、无构建步骤，npm 预构建包不需要任何授权。
@@ -86,13 +86,13 @@ dsh plugin --profile web add ./dsh-mobile-pwa
 | `LAN_GATE_TARGET_PORT` | `3080` | 本机 DSH Web UI 端口（插件会自动填 `webStartup.port`，此变量优先） |
 | `LAN_GATE_RATE_LIMIT` | `120` | 每 IP 每分钟请求上限 |
 | `LAN_GATE_PASSWORD` | 空 | 访问密码。设了之后打开网关先要输密码，密码只存在服务器上，浏览器拿到的是 HMAC 派生的会话 cookie |
-| `LAN_GATE_TRUSTED_HOSTS` | 空 | **对外服务地址白名单**，逗号分隔（如 `111.170.171.25,app.example`）。DSH 0.2 的 Host/Origin 栅栏按浏览器看到的 Host 校验，网关原样透传 Host，所以这里必须声明对外地址；不带端口的条目匹配任意端口 |
+| `LAN_GATE_TRUSTED_HOSTS` | 空 | **对外服务地址白名单**，逗号分隔（如 `203.0.113.10,app.example`）。DSH 0.2 的 Host/Origin 栅栏按浏览器看到的 Host 校验，网关原样透传 Host，所以这里必须声明对外地址；不带端口的条目匹配任意端口 |
 | `LAN_GATE_REWRITE_HOST` | 空 | 设为 `1` 时把 Host 改写成回环地址（仅老版本 DSH 需要） |
 | `LAN_GATE_DSH_TOKEN` | 自动 | DSH 进程 launch token，插件从 `ctx.connection` 自动读取并交给网关 |
 | `LAN_GATE_PUBLIC_URL` | 空 | 仅用于生成 token 化 URL 时的基准地址 |
 | `LAN_GATE_VAPID_PUBLICKEY` | 自动生成 | Web Push VAPID 公钥（base64url） |
 | `LAN_GATE_VAPID_PRIVATEKEY` | 自动生成 | Web Push VAPID 私钥（base64url PKCS#8） |
-| `LAN_GATE_VAPID_SUBJECT` | `mailto:dsh-mobile-pwa@localhost` | VAPID 联系方式 |
+| `LAN_GATE_VAPID_SUBJECT` | `mailto:dsbot@localhost` | VAPID 联系方式 |
 
 > VAPID 密钥对未提供时会自动生成一次并保存到 `~/.dsh/lan-gate-vapid.json`（权限 600），重启不失效。
 
@@ -109,7 +109,7 @@ DSH 0.2 起，浏览器要拿一个**签名 session cookie** 才能用 Web UI，
 
 ### 使用流程
 
-1. **服务端**：启动 DSH + 本插件，看到 `[lan-gate] listening on 0.0.0.0:3088 -> <host>:<port> (pwa=on)`。
+1. **服务端**：启动 DSH + 本插件，看到 `[dsbot] listening on 0.0.0.0:3088 -> <host>:<port> (pwa=on)`。
 2. **手机**：浏览器打开 `http://<你的IP>:3088` → 出现「等待本机批准」。
 3. **电脑**：打开 `http://127.0.0.1:3088/lan-gate/admin` → 批准该设备并选「手机」。
 4. **手机**：下拉刷新 → 进入 DSH Web UI（已注入 PWA）。

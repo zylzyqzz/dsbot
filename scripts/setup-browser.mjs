@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-shot Bot browser setup for DSBot / dsh-mobile-pwa.
+ * One-shot Bot browser setup for DSBot / dsbot.
  *
  * ds-bot can drive a real Chrome, but it ships no browser: it expects
  * `playwrightUrl` + `browserExecutablePath` to point at a Playwright build and a

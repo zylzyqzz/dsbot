@@ -1,5 +1,5 @@
 {
-  "name": "dsh-mobile-pwa",
+  "name": "@zylzyqzz/dsbot",
   "version": "0.3.0",
   "description": "Complete mobile PWA for DeepSeek Harness (DSH): secure remote-access gateway + install-to-homescreen manifest + offline-capable service worker + touch-first gestures + agent-done notifications + dark compact mobile UI + a real Chrome browser for your Bots (one-command setup). 移动端 PWA 完整方案，含 Bot 浏览器一键安装。",
   "license": "MIT",
@@ -65,7 +65,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zylzyqzz/dsh-mobile-pwa.git"
+    "url": "git+https://github.com/zylzyqzz/dsbot.git"
   },
   "engines": {
     "node": ">=20.0.0",

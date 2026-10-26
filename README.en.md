@@ -1,13 +1,13 @@
-# dsh-mobile-pwa · DeepSeek Harness as a real mobile PWA
+# DSBot · DeepSeek Harness as a real mobile PWA
 
 > Turn [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) into a **complete mobile PWA**: secure remote access to your own DSH, install-to-homescreen, offline capable, touch gestures, agent-done notifications.
 
 Built on the MIT [`dsh-mobile-gate`](https://github.com/Bernardxu123/dsh-mobile-gate) gateway base.
 
-**Current version `0.2.0` — targets DSH `0.2.x`** (`engines.dsh: ">=0.2.0 <0.3.0"`).
+**Current version `0.3.0` — targets DSH `0.2.x`** (`engines.dsh: ">=0.2.0 <0.3.0"`).
 
-[![npm version](https://img.shields.io/npm/v/dsh-mobile-pwa)](https://www.npmjs.com/package/dsh-mobile-pwa)
-[![license](https://img.shields.io/github/license/zylzyqzz/dsh-mobile-pwa)](https://github.com/zylzyqzz/dsh-mobile-pwa/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/%40zylzyqzz%2Fdsbot)](https://www.npmjs.com/package/@zylzyqzz/dsbot)
+[![license](https://img.shields.io/github/license/zylzyqzz/dsbot)](https://github.com/zylzyqzz/dsbot/blob/main/LICENSE)
 
 ---
 
@@ -48,16 +48,16 @@ laptop 127.0.0.1:3088/lan-gate/admin -> approve / deny / revoke, pick phone / de
 ## Install
 
 ```bash
-npm add dsh-mobile-pwa@0.2.0
-dsh plugin --profile web add dsh-mobile-pwa
+npm add @zylzyqzz/dsbot@0.3.0
+dsh plugin --profile web add @zylzyqzz/dsbot
 ```
 
 From a checkout:
 
 ```bash
-git clone https://github.com/zylzyqzz/dsh-mobile-pwa.git
-cd dsh-mobile-pwa
-dsh plugin --profile web add ./dsh-mobile-pwa
+git clone https://github.com/zylzyqzz/dsbot.git
+cd dsbot
+dsh plugin --profile web add ./dsbot
 ```
 
 ### Environment variables
@@ -70,13 +70,13 @@ dsh plugin --profile web add ./dsh-mobile-pwa
 | `LAN_GATE_TARGET_PORT` | `3080` | DSH Web UI port (the plugin fills `webStartup.port`; this wins) |
 | `LAN_GATE_RATE_LIMIT` | `120` | Requests per IP per minute |
 | `LAN_GATE_PASSWORD` | – | Access password. When set, the gateway asks for it before serving anything. The password stays on the server; the browser only gets an HMAC-derived session cookie |
-| `LAN_GATE_TRUSTED_HOSTS` | – | **Public authorities the gateway serves**, comma separated (`111.170.171.25,app.example`). DSH 0.2's Host/Origin fence compares the browser-facing Host, which the gateway forwards unchanged, so the public authority has to be declared here; a port-less entry matches any port |
+| `LAN_GATE_TRUSTED_HOSTS` | – | **Public authorities the gateway serves**, comma separated (`203.0.113.10,app.example`). DSH 0.2's Host/Origin fence compares the browser-facing Host, which the gateway forwards unchanged, so the public authority has to be declared here; a port-less entry matches any port |
 | `LAN_GATE_REWRITE_HOST` | – | Set to `1` to rewrite Host to the loopback address (only needed by older DSH) |
 | `LAN_GATE_DSH_TOKEN` | auto | DSH process launch token; the plugin reads it from `ctx.connection` and hands it to the gateway |
 | `LAN_GATE_PUBLIC_URL` | – | Base URL used when minting the tokenized URL |
 | `LAN_GATE_VAPID_PUBLICKEY` | generated | Web Push VAPID public key (base64url) |
 | `LAN_GATE_VAPID_PRIVATEKEY` | generated | Web Push VAPID private key (base64url PKCS#8) |
-| `LAN_GATE_VAPID_SUBJECT` | `mailto:dsh-mobile-pwa@localhost` | VAPID contact |
+| `LAN_GATE_VAPID_SUBJECT` | `mailto:dsbot@localhost` | VAPID contact |
 
 > When no VAPID keypair is supplied, one is generated once and stored in `~/.dsh/lan-gate-vapid.json` (mode 600) so subscriptions survive restarts.
 
@@ -93,7 +93,7 @@ DSH must trust the public authority for this to work: set `LAN_GATE_TRUSTED_HOST
 
 ### Flow
 
-1. **Server**: start DSH with the plugin; look for `[lan-gate] listening on 0.0.0.0:3088 -> <host>:<port> (pwa=on)`.
+1. **Server**: start DSH with the plugin; look for `[dsbot] listening on 0.0.0.0:3088 -> <host>:<port> (pwa=on)`.
 2. **Phone**: open `http://<server-ip>:3088` → "waiting for approval".
 3. **Laptop**: open `http://127.0.0.1:3088/lan-gate/admin` → approve the device, choose "phone".
 4. **Phone**: pull to refresh → the DSH Web UI, PWA injected.

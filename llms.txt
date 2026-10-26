@@ -1,11 +1,11 @@
-# dsh-mobile-pwa
+# dsbot
 
 > Complete mobile PWA for DeepSeek Harness (DSH): secure remote access gateway + install-to-homescreen + offline + touch gestures + agent-done push.
 
 ## Key facts
-- Repo: zylzyqzz/dsh-mobile-pwa. MIT license, `dsh-plugin` topic. Derivative of `dsh-mobile-gate` (MIT).
+- Repo: zylzyqzz/dsbot. MIT license, `dsh-plugin` topic. Derivative of `dsh-mobile-gate` (MIT).
 - Targets **DeepSeek Harness 0.2.x** (`engines.dsh: ">=0.2.0 <0.3.0"`). The 0.1.x Web-UI DOM is gone; the CSS now targets the 0.2 slot vocabulary.
-- Install: `npm add dsh-mobile-pwa` then `dsh plugin --profile web add dsh-mobile-pwa` (or `dsh plugin --profile web add ./dsh-mobile-pwa` for a checkout).
+- Install: `npm add @zylzyqzz/dsbot` then `dsh plugin --profile web add @zylzyqzz/dsbot` (or `dsh plugin --profile web add ./dsbot` for a checkout).
 - Architecture: standalone child-process Node gateway (zero-dep), reverse-proxies approved LAN/remote devices to the DSH Web UI; DSH's own webserver is never rebound. DSH 0.2 refuses a wildcard bind address, so this gateway is the remote door.
 - Target address is resolved from the `webStartup` service (`dsh web --host/--port`), not hardcoded; the plugin passes it to the child explicitly because DSH 0.2 scrubs the child environment.
 - Gateway serves `/pwa/*` assets (manifest, sw.js, app.css, icons, offline.html) + `/pwa/push/*` (real Web Push: RFC 8291 aes128gcm body, RFC 8292 VAPID auth).
@@ -17,4 +17,3 @@
 
 ## Docs
 - README.md (中文), README.en.md (English), AGENTS.md (dev guide), LICENSE.
-- .ai/ — AI Project OS state, memory, decisions, tasks.

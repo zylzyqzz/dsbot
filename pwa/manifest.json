@@ -1,7 +1,7 @@
 {
-  "name": "DeepSeek Harness Mobile",
-  "short_name": "DSH Mobile",
-  "description": "DeepSeek Harness on your phone. Secure remote access to your own DSH server.",
+  "name": "DSBot",
+  "short_name": "DSBot",
+  "description": "DSBot on your phone. Secure remote access to your own DSH server.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
