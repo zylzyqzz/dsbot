@@ -481,7 +481,7 @@ html[data-dsh-lan-drawer="on"] .dsh-lan-frame {
 }
 
 html[data-dsh-lan-drawer="on"] .dsh-lan-sidebar-col {
-  --dsh-lan-drawer-w: min(300px, 84vw);
+  --dsh-lan-drawer-w: min(225px, 63vw);
   position: relative;
   z-index: 40;
   width: var(--dsh-lan-drawer-w) !important;
@@ -810,11 +810,11 @@ html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button {
   color: var(--dsw-alias-text-secondary, #6b7280) !important;
 }
 
-/* The drawer closes with a hairline above the gear so the foot reads as a
-   distinct zone instead of a stray icon in empty space. */
+/* No rule above the gear: the foot is one flat area, and a line there only cut
+   the drawer in two. */
 html[data-dsh-lan-drawer="on"] .hHd-Xa_footArea {
-  border-top: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .14)) !important;
-  padding-top: 6px !important;
+  border-top: 0 !important;
+  padding-top: 0 !important;
 }
 
 html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button > * {
@@ -823,15 +823,18 @@ html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button > * {
 
 html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button::before {
   content: '';
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   background-color: currentColor;
-  -webkit-mask: var(--lan-gear) center / 24px 24px no-repeat;
-  mask: var(--lan-gear) center / 24px 24px no-repeat;
+  -webkit-mask: var(--lan-gear) center / 26px 26px no-repeat;
+  mask: var(--lan-gear) center / 26px 26px no-repeat;
 }
 
 html[data-dsh-lan-drawer="on"] {
-  --lan-gear: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3.1'/%3E%3Cpath d='M19.4 14.2a1.7 1.7 0 0 0 .3 1.9 1.4 1.4 0 1 1-2 2 1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5 1.4 1.4 0 1 1-2.8 0 1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3 1.4 1.4 0 1 1-2-2 1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1.1 1.4 1.4 0 1 1 0-2.8 1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9 1.4 1.4 0 1 1 2-2 1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 11 5.2a1.4 1.4 0 1 1 2.8 0 1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3 1.4 1.4 0 1 1 2 2 1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1.1 1.4 1.4 0 1 1 0 2.8 1.7 1.7 0 0 0-1.5 1z'/%3E%3C/svg%3E");
+  /* A solid gear silhouette rather than a 1.7px outline: at 26px the hairline
+     gear's teeth and body merge into a star, while the filled shape keeps a
+     readable ring and hub. */
+  --lan-gear: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.1 7.1 0 0 0-1.62-.94l-.36-2.54A.48.48 0 0 0 13.92 2h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.73 8.47c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z'/%3E%3C/svg%3E");
 }
 
 /* "Switch to the classic Agent mode" is desktop-only: this build is the Bot
