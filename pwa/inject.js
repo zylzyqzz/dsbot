@@ -65,6 +65,40 @@
     }
   }
 
+  // ---- Composer: keep the floating capsule in view, smoothly ------------
+  // The capsule floats above the bottom edge, so once the on-screen keyboard
+  // opens it can sit under it. DSH lays the composer out in a shrinking
+  // viewport, so the fix is not a transform (that would shift it twice) but a
+  // smooth scroll of the seat into view after the keyboard has settled.
+  //
+  // The field is a contenteditable div carrying data-composer-input, not a
+  // textarea: DSH's composer is a rich input.
+  function watchComposer() {
+    var field = document.querySelector('[data-composer-input], [data-composer-card] textarea, [data-composer-card] [contenteditable="true"]')
+    if (!field || field.getAttribute('data-lan-composer')) return
+    field.setAttribute('data-lan-composer', '1')
+
+    var settle = 0
+    var reveal = function () {
+      clearTimeout(settle)
+      // The keyboard animation is the browser's; wait it out, then glide the
+      // seat into view. 'nearest' keeps an already-visible composer still.
+      settle = setTimeout(function () {
+        var seat = document.querySelector('.wSkVaW_composerStack')
+        if (!seat) return
+        try { seat.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } catch (e) { /* older engine */ }
+      }, 260)
+    }
+
+    field.addEventListener('focus', reveal)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', function () {
+        var active = document.activeElement
+        if (active === field || (field.contains && field.contains(active))) reveal()
+      })
+    }
+  }
+
   // ---- Register service worker ------------------------------------------
   var swReady = null
   if ('serviceWorker' in navigator) {
@@ -565,6 +599,8 @@
       chromeSetup()
       // A settings panel or the account menu may have just mounted.
       stripClassicSwitch()
+      // The composer may have been re-rendered; re-attach the reveal hook.
+      watchComposer()
     })
     var startObserving = function () {
       if (document.body) {

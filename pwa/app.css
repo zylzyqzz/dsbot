@@ -233,40 +233,68 @@ html[data-dsh-lan-drawer="on"] .bt-row:active {
 }
 
 /* =====================================================================
- * Composer, Muse register.
+ * Composer, Muse register: a floating capsule.
  *
- * A pill floating over the conversation: one rounded surface, the plus on the
- * left, the mic on the right, the field itself transparent inside it. DSH
- * builds this out of a stack plus two slots, so the surface has to be drawn
- * on the stack and the padding moved off the dock.
+ * It hovers off the bottom edge instead of being welded to it — margin on all
+ * four sides, a soft shadow doing the lifting, and a radius that reads as a
+ * capsule at one line and stays a rounded card as the field grows.
+ *
+ * Motion rules, same as the rest of the shell: only compositor properties are
+ * animated (transform, opacity) plus radius and shadow, which are cheap for a
+ * single small element. Nothing here touches layout mid-scroll.
  * ===================================================================== */
 html[data-dsh-lan-drawer="on"] .wSkVaW_composerStack {
-  padding: 0 10px calc(10px + max(env(safe-area-inset-bottom), 0px)) !important;
+  /* The inset is what makes it float; the capsule never touches an edge. */
+  padding: 0 12px calc(14px + max(env(safe-area-inset-bottom), 0px)) !important;
   background: transparent !important;
+  /* Any reposition DSH performs (keyboard, dock resize) lands softly instead
+     of snapping. */
+  transition: padding-bottom 220ms var(--lan-ease, ease-out),
+              transform 220ms var(--lan-ease, ease-out);
 }
 
-html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"] {
-  background: var(--dsw-alias-bg-base, #fff);
-  border: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .22));
-  border-radius: 26px;
-  padding: 0 !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
-  transition: border-color var(--lan-fast, 140ms) linear,
-              box-shadow var(--lan-fast, 140ms) linear;
+/* The dock and its inner card are `display: contents` wrappers in DSH's
+   layout, so the capsule's surface is drawn on `[data-composer-card]` — that
+   is the box that actually exists. The dock keeps the same treatment for the
+   builds where it does have a box, so the two never disagree. */
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"],
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.composer.bar"] {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
-/* Focus reads as a slightly darker edge rather than a glow: a phone screen
-   under a thumb does not need a halo. */
-html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"]:focus-within {
-  border-color: var(--dsw-alias-border-l2, rgba(128, 128, 128, .4));
-}
-
-/* The composer card inside the dock is what actually holds the field. */
+html[data-dsh-lan-drawer="on"] [data-slot="conversation.input.dock"],
 html[data-dsh-lan-drawer="on"] [data-composer-card] {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  border-radius: 26px !important;
+  background: var(--dsw-alias-bg-base, #fff) !important;
+  border: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .20)) !important;
+  /* 30px is half the resting height, so one line is a true capsule; a grown
+     field keeps the same radius and reads as a rounded card, like Muse. */
+  border-radius: 30px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .07), 0 1px 2px rgba(0, 0, 0, .04) !important;
+  transform: translate3d(0, 0, 0);
+  transition: border-radius 220ms var(--lan-ease, ease-out),
+              border-color 160ms linear,
+              box-shadow 220ms var(--lan-ease, ease-out),
+              transform 220ms var(--lan-ease, ease-out);
+}
+
+/* The card is the visible box, so the float inset is enforced here rather than
+   inherited: the slots around it carry their own padding. */
+html[data-dsh-lan-drawer="on"] [data-composer-card] {
+  margin-left: 12px !important;
+  margin-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* Focus lifts the capsule a hair and deepens the shadow: motion the thumb can
+   feel without a colour halo.
+   `:focus-visible` rather than `:focus-within`: DSH focuses the composer on
+   load, so `:focus-within` would leave the capsule permanently lifted and the
+   animation would never be seen. */
+html[data-dsh-lan-drawer="on"] [data-composer-card]:has([data-composer-input]:focus-visible) {
+  border-color: var(--dsw-alias-border-l2, rgba(128, 128, 128, .34)) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .10), 0 1px 2px rgba(0, 0, 0, .05) !important;
+  transform: translate3d(0, -1px, 0);
 }
 
 /* The plus and the mic sit inside the pill, so they lose the leftover
