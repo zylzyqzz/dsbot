@@ -329,12 +329,21 @@ html[data-dsh-lan-drawer="on"] .bt-row[data-selected="true"] {
 /* The sidebar already carries its own brand line, so that line becomes the
    Muse masthead: it sits on the top row at full size, the three round actions
    move to the right edge of that same row, and the row clears the close
-   button that floats over the drawer's corner. */
+   button that floats over the drawer's corner. The row is widened to the
+   drawer's own box so the actions can reach the right edge. */
+html[data-dsh-lan-drawer="on"] .bt-side {
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+}
+
 html[data-dsh-lan-drawer="on"] .bt-side-top {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  /* left clears the floating close button; right sits on the drawer edge */
   padding: 0 12px 0 52px !important;
   min-height: 52px !important;
   height: auto !important;
@@ -767,7 +776,9 @@ html[data-dsh-lan-drawer="on"] {
 }
 
 /* "Switch to the classic Agent mode" is desktop-only: this build is the Bot
-   surface, and the entry only leads away from it. */
+   surface, and the entry only leads away from it — the classic screen has no
+   way back. The switch is removed from the DOM by pwa/inject.js, matched on
+   its own label, because the class names are hashed per build. */
 html[data-dsh-lan-drawer="on"] .bt-account-menu > button:last-of-type {
   display: none !important;
 }

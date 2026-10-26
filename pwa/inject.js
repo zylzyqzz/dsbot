@@ -14,6 +14,25 @@
 
   var PWA = window.__DSH_PWA__
 
+  // ---- Pin the Bot surface ----------------------------------------------
+  // ds-bot picks its UI from localStorage: readMode() treats "agent" as the
+  // classic Agent screen and anything else as Bot. The classic screen has no
+  // way back, so a single tap strands the app in a UI this build does not
+  // support. This gateway is the Bot surface, so the key is cleared before the
+  // app boots; the reload happens once, guarded, so the page can never loop.
+  try {
+    var SURFACE_KEY = 'ds-bot:surface'
+    var GUARD_KEY = 'dsh-lan-surface-reset'
+    if (localStorage.getItem(SURFACE_KEY) === 'agent') {
+      localStorage.removeItem(SURFACE_KEY)
+      if (!sessionStorage.getItem(GUARD_KEY)) {
+        sessionStorage.setItem(GUARD_KEY, '1')
+        location.reload()
+        return
+      }
+    }
+  } catch (e) { /* storage blocked: nothing to pin */ }
+
   function base64UrlToBytes(value) {
     var padded = String(value || '').replace(/-/g, '+').replace(/_/g, '/')
     while (padded.length % 4) padded += '='
@@ -21,6 +40,29 @@
     var bytes = new Uint8Array(binary.length)
     for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
     return bytes
+  }
+
+  // ---- Remove the classic-mode switch ------------------------------------
+  // The Bot surface is what this build is; the classic Agent screen has no way
+  // back, so one tap strands the app there. The settings page carries that
+  // switch in a "模式" section, and its markup uses hashed class names, so the
+  // section is found by its own label and taken out of the DOM.
+  var CLASSIC_RE = /经典\s*Agent\s*模式|Classic\s*Agent\s*mode/i
+
+  function stripClassicSwitch() {
+    var sections = document.querySelectorAll('[role="dialog"] .bt-set-section, [role="dialog"] section')
+    for (var i = 0; i < sections.length; i++) {
+      var section = sections[i]
+      if (section.getAttribute('data-lan-no-classic')) continue
+      if (!CLASSIC_RE.test(section.textContent || '')) continue
+      section.setAttribute('data-lan-no-classic', '1')
+      section.remove()
+    }
+    // The account menu carries the same door.
+    var menus = document.querySelectorAll('.bt-account-menu button, [role="menu"] button')
+    for (var j = 0; j < menus.length; j++) {
+      if (CLASSIC_RE.test(menus[j].textContent || '')) menus[j].remove()
+    }
   }
 
   // ---- Register service worker ------------------------------------------
@@ -521,6 +563,8 @@
       // The sidebar only exists once the app has rendered; wire the drawer
       // to it as soon as it shows up.
       chromeSetup()
+      // A settings panel or the account menu may have just mounted.
+      stripClassicSwitch()
     })
     var startObserving = function () {
       if (document.body) {
