@@ -296,7 +296,12 @@ html[data-dsh-lan-drawer="on"] [class*="_addTab_"] {
  * animated (transform, opacity) plus radius and shadow, which are cheap for a
  * single small element. Nothing here touches layout mid-scroll.
  * ===================================================================== */
-html[data-dsh-lan-drawer="on"] .wSkVaW_composerStack {
+/* The composer stack is the element that *contains* the composer bar slot.
+   It has no slot of its own, so it is addressed through the slot it holds:
+   :has(> [data-slot=...]) selects exactly that parent and nothing else.
+   Upstream rebuilds its hashed class names on every frontend release, so
+   nothing here may depend on one. */
+html[data-dsh-lan-drawer="on"] :has(> [data-slot="conversation.composer.bar"]) {
   /* The inset is what makes it float; the capsule never touches an edge.
      Width is pinned to the viewport so the float is symmetric: the stack's
      own box was 7px short of the screen, which pushed the capsule off centre. */
@@ -342,11 +347,13 @@ html[data-dsh-lan-drawer="on"] [data-composer-card] {
               transform 220ms var(--lan-ease, ease-out);
 }
 
-/* The wrappers stop short of the right edge (DSH's composer seat is 7px
-   narrower than the screen) and carry asymmetric padding, so centring inside
-   them left the capsule visibly off centre. Both are stretched to the viewport
-   here, and the capsule then centres itself the ordinary way. */
-html[data-dsh-lan-drawer="on"] .uV2eYG_root {
+/* The card wrapper stops short of the right edge (DSH's composer seat is 7px
+   narrower than the screen) and carries asymmetric padding, so centring inside
+   it left the capsule visibly off centre. It is addressed as the parent of
+   the composer card, which is a stable data attribute rather than a hashed
+   class name. Both are stretched to the viewport here, and the capsule then
+   centres itself the ordinary way. */
+html[data-dsh-lan-drawer="on"] :has(> [data-composer-card]) {
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: 0 !important;
@@ -354,7 +361,7 @@ html[data-dsh-lan-drawer="on"] .uV2eYG_root {
   box-sizing: border-box !important;
 }
 
-html[data-dsh-lan-drawer="on"] .wSkVaW_composerStack {
+html[data-dsh-lan-drawer="on"] :has(> [data-slot="conversation.composer.bar"]) {
   width: 100vw !important;
   max-width: 100vw !important;
   margin-left: 0 !important;

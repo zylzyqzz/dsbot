@@ -63,10 +63,25 @@ into the served HTML.
 4. **Scope mobile CSS**: every mobile rule must be prefixed with
    `html[data-lan-device="phone"]` (or the `@media (max-width:820px)` fallback that
    excludes `desktop`). Desktop must never be affected.
-5. **Stable selectors**: prefer `[data-slot]`/`[data-*]`/ARIA selectors over hashed build
-   class names (`Sh0Q9G_` etc.), which change per frontend build. When DSH renames a
-   slot, the mobile layout silently stops applying — re-check the slot list against the
-   upstream `packages/client` sources.
+5. **Stable selectors — a hard rule, not a preference**: every rule in `pwa/app.css` and every
+   lookup in `pwa/*.js` MUST address the host through a published surface:
+   - `[data-slot="..."]` — the slot vocabulary DSH publishes
+     (`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts`, 105 slots);
+   - the host's own semantic markers (`[data-chat-running]`, `[data-composer-card]`,
+     `[data-composer-input]`, `[data-phase]`, `[data-streaming]`, …);
+   - ARIA roles and attributes.
+
+   Upstream's hashed build class names (`Sh0Q9G_`, `wSkVaW_composerStack`, `uV2eYG_root`, …)
+   are rebuilt on every frontend release. A rule that targets one breaks **silently**: the
+   layout stops applying and nothing reports an error. The shell currently targets
+   **zero** upstream-private class names, and `test/upstream-coupling.test.cjs` fails the
+   build if one comes back.
+
+   When an element has no slot of its own, address it through what it holds, not through a
+   class name: `:has(> [data-slot="conversation.composer.bar"])` selects the composer stack,
+   `:has(> [data-composer-card])` selects the card wrapper. When DSH renames a slot, the
+   mobile layout silently stops applying — re-check the slot list against the upstream
+   `packages/client` sources and the upstream slot catalog.
 6. **Persistence**: approvals stored at `~/.dsh/lan-gate-state.json`; the VAPID keypair at
    `~/.dsh/lan-gate-vapid.json`; the pending list (`seen`) is in-memory and resets on restart.
 7. **Approval binds an address, a token binds a browser**: never collapse them back into one

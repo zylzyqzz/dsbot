@@ -84,7 +84,11 @@
       // The keyboard animation is the browser's; wait it out, then glide the
       // seat into view. 'nearest' keeps an already-visible composer still.
       settle = setTimeout(function () {
-        var seat = document.querySelector('.wSkVaW_composerStack')
+        // The composer stack is the element that holds the composer bar slot.
+        // Upstream rebuilds its hashed class name on every frontend release,
+        // so the published slot is the anchor.
+        var bar = document.querySelector('[data-slot="conversation.composer.bar"]')
+        var seat = bar ? bar.parentElement : null
         if (!seat) return
         try { seat.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) } catch (e) { /* older engine */ }
       }, 260)
