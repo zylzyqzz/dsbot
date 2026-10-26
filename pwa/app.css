@@ -408,26 +408,53 @@ html[data-dsh-lan-drawer="on"] .bt-side-top {
   height: auto !important;
 }
 
-/* The brand takes its own row, centred, and drops below the actions. */
+/* The brand takes its own row, centred, and drops below the actions.
+   DSH sets the label's font size on an inner span (14px), so the size has to
+   be forced there; styling only `.bt-brand` leaves the text at 14px while the
+   element reports 39px.
+   The row's left padding (52px, room for the close button) would drag the
+   centred title to the right, so the brand pulls back by that much and adds
+   it to its own width: it then centres on the drawer, not on the padded box. */
 html[data-dsh-lan-drawer="on"] .bt-brand {
   order: 2 !important;
   flex: 1 0 100% !important;
   justify-content: center !important;
-  margin: 38px 0 0 !important;
+  /* Pull back the row's 52px close-button padding and add the same again to
+     the width, so the centred title centres on the drawer instead of on the
+     padded box. */
+  margin: 26px 0 0 -40px !important;
   padding: 0 !important;
-  font: 700 39px/1.12 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important;
-  letter-spacing: -.035em !important;
-  color: var(--dsw-alias-text-primary, #111) !important;
+  width: calc(100% + 40px) !important;
   height: auto !important;
-  gap: 12px !important;
+  gap: 10px !important;
   white-space: nowrap !important;
+}
+
+html[data-dsh-lan-drawer="on"] .bt-brand > span:not(.bt-brand-whale) {
+  font: 700 26px/1.1 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+  letter-spacing: -.04em !important;
+  color: var(--dsw-alias-text-primary, #111) !important;
+  /* No width cap: the masthead is short by design, and clamping it only
+     truncated the name to "DS …". The row is already 100% wide. */
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+
+/* The whale plus the label is what gets centred, so the pair must be a single
+   centring context rather than two flex items with a gap. */
+html[data-dsh-lan-drawer="on"] .bt-brand {
+  justify-content: center !important;
+  text-align: center !important;
 }
 
 /* The whale mark is part of the masthead, so it grows with the type. */
 html[data-dsh-lan-drawer="on"] .bt-brand .bt-mark,
 html[data-dsh-lan-drawer="on"] .bt-brand .bt-brand-whale {
-  width: 40px !important;
-  height: 40px !important;
+  width: 36px !important;
+  height: 36px !important;
   flex: none !important;
 }
 
@@ -474,6 +501,26 @@ html[data-dsh-lan-drawer="on"] .bt-tile .bt-mark > svg {
   width: 34px !important;
   height: 34px !important;
   flex: none !important;
+}
+
+/* The preview line under a bot name is a whole message. In a 225px drawer it
+   either wraps to three lines or pushes the name out of view, so it is capped
+   at 8 characters with an ellipsis: enough to recognise the thread, never
+   enough to break the row's rhythm.
+   The row is `button.bt-tile > span.bt-mark + <text column>`; the preview is
+   the second line inside that column. */
+html[data-dsh-lan-drawer="on"] .bt-tile > span.bt-mark ~ div > *:nth-child(2),
+html[data-dsh-lan-drawer="on"] .bt-tile > span.bt-mark ~ span:not(.bt-mark) {
+  display: block !important;
+  max-width: 8.6em !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* One line only, whatever the message was. */
+html[data-dsh-lan-drawer="on"] .bt-tile {
+  overflow: hidden !important;
 }
 
 html[data-dsh-lan-drawer="on"] .dsh-lan-frame {
@@ -791,9 +838,15 @@ html[data-dsh-lan-drawer="on"] [data-slot="sidebar.footer.action"] > * {
 
    The slot wrapper itself is `display: contents`, so it has no box to
    position: the absolute placement has to go on the button. */
+/* `position: fixed` rather than absolute: the drawer carries a transform, so a
+   fixed child is laid out against the drawer itself — the one containing block
+   guaranteed to exist. An absolute child was landing inside a 0-width settings
+   slot and ended up off screen. `right: 12px` then sits on the drawer's own
+   right edge, no magic offsets. */
 html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button {
-  position: absolute;
-  left: 12px;
+  position: fixed;
+  right: 12px;
+  left: auto;
   bottom: calc(12px + max(env(safe-area-inset-bottom), 0px));
   z-index: 6;
   width: 40px !important;
@@ -808,6 +861,8 @@ html[data-dsh-lan-drawer="on"] [data-slot="settings.launcher"] button {
   border-radius: 999px !important;
   background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 6%, transparent) !important;
   color: var(--dsw-alias-text-secondary, #6b7280) !important;
+  margin: 0 !important;
+  transform: none !important;
 }
 
 /* No rule above the gear: the foot is one flat area, and a line there only cut
