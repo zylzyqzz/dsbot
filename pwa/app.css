@@ -233,6 +233,59 @@ html[data-dsh-lan-drawer="on"] .bt-row:active {
 }
 
 /* =====================================================================
+ * File-preview tab strip.
+ *
+ * DSH renders the strip as a bare row of chips sitting straight on the content
+ * edge: 38px tall with 10px top padding and no surface of its own, so the tabs
+ * look pasted onto the page. It gets its own band, a hairline under it, and
+ * chips that read as tabs.
+ * ===================================================================== */
+[data-lan-device="phone"] [class*="_tabStrip_"],
+html[data-dsh-lan-drawer="on"] [class*="_tabStrip_"] {
+  height: 48px !important;
+  padding: 7px 10px !important;
+  gap: 6px !important;
+  background: var(--dsw-alias-bg-base, #fff);
+  border-bottom: 1px solid var(--dsw-alias-border-l3, rgba(128, 128, 128, .14));
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+[data-lan-device="phone"] [class*="_tabStrip_"]::-webkit-scrollbar,
+html[data-dsh-lan-drawer="on"] [class*="_tabStrip_"]::-webkit-scrollbar { display: none; }
+
+/* A tab is a chip with its own bounds, not bare text. */
+html[data-dsh-lan-drawer="on"] [class*="_tabStrip_"] > *:not([class*="_addTab_"]) {
+  flex: none !important;
+  height: 34px !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  color: var(--dsw-alias-text-secondary, #6b7280);
+  max-width: 68vw !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html[data-dsh-lan-drawer="on"] [class*="_tabStrip_"] > *:not([class*="_addTab_"]):active {
+  background: color-mix(in srgb, var(--dsw-alias-text-primary, #111) 7%, transparent);
+}
+
+/* The add button keeps the strip's rhythm instead of floating taller. */
+html[data-dsh-lan-drawer="on"] [class*="_addTab_"] {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  border-radius: 10px !important;
+  flex: none !important;
+}
+
+/* =====================================================================
  * Composer, Muse register: a floating capsule.
  *
  * It hovers off the bottom edge instead of being welded to it — margin on all
