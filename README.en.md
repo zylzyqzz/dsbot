@@ -21,6 +21,7 @@ Built on the MIT [`dsh-mobile-gate`](https://github.com/Bernardxu123/dsh-mobile-
 | 👆 **Touch gestures** | Pull-to-refresh, edge-swipe back, pinch font zoom. |
 | 🔔 **Agent-done notifications** | Real Web Push (RFC 8291 aes128gcm body, RFC 8292 VAPID auth). |
 | 📐 **Touch layout** | 44px targets, safe-area insets, full-screen dialogs, compact type, scrollable code — desktop untouched. |
+| 🌐 **Bot browser** | One command gives your Bots a real Chrome (Chrome for Testing + playwright-core + proxy shim + profile patch + self-check). Screenshots land **in the conversation**, and login/payment/captcha can be handed off to the human. See [docs/browser.md](docs/browser.md) |
 | 🎯 **0.2 DOM alignment** | The mobile CSS targets the DSH 0.2 slot vocabulary (`main.conversation`, `conversation.view`, `conversation.chat.flow`, `conversation.input.model`, `conversation.composer.dock`, …). Every 0.1-era selector is gone. |
 
 ---
@@ -101,6 +102,33 @@ DSH must trust the public authority for this to work: set `LAN_GATE_TRUSTED_HOST
 
 ---
 
+## Bot browser (real Chrome, one command)
+
+ds-bot ships 12 browser tools but **no browser**, its launch args are hardcoded, and it has no proxy setting. One command fills the gap:
+
+```bash
+# on your DSH server
+node scripts/setup-browser.mjs --proxy http://127.0.0.1:7890
+sudo systemctl restart dsh-web
+```
+
+It downloads Chrome for Testing, installs the system libraries (including the Ubuntu 24.04 `libasound2t64` rename),
+installs playwright-core, drops in the proxy shim, **opens a real page to verify**, then writes the `- id: bot`
+row into your profile patch (with a backup).
+
+Your Bots then get `browser_open` / `browser_snapshot` / `browser_click` / `browser_screenshot` /
+`browser_handoff` and seven more — and a screenshot arrives **as an image in the conversation**, not a tool log line.
+
+```bash
+node scripts/setup-browser.mjs --verify-only      # doctor at any time
+node scripts/setup-browser.mjs --print-config     # just print the YAML
+sudo node scripts/xray-split-route.mjs            # split route: China direct, rest proxied
+```
+
+Why the shim exists, how proxy selection works, troubleshooting → **[docs/browser.md](docs/browser.md)**
+
+---
+
 ## How agent-done is detected
 
 DSH 0.2 renders `[data-chat-running]` while the agent is working. The injected script watches it with a `MutationObserver`; when it disappears the turn is over, so the page raises a local `Notification` and reports it to the gateway, which pushes it to the other subscribed devices.
@@ -134,7 +162,13 @@ Boots the real gateway behind a mock upstream and asserts `/pwa` asset serving, 
 | `pwa/offline.html` | Offline fallback |
 | `pwa/icons/` | SVG source + 192/512 PNG + maskable icons |
 | `cordis.patch.yml` / `.example` | Bundle patch layer |
-| `test/gateway.test.cjs` | Smoke tests |
+| `scripts/setup-browser.mjs` | One-command Bot browser: Chrome + system libs + playwright-core + shim + self-check + profile patch |
+| `scripts/verify-browser.mjs` | Browser doctor: opens a real page and prints a JSON report |
+| `scripts/pw-proxy-shim.mjs` | Playwright shim: injects `--proxy-server` and drops automation flags without patching ds-bot |
+| `scripts/xray-split-route.mjs` | Fix xray routing: China direct, rest proxied, with `xray -test` and automatic rollback |
+| `docs/browser.md` | Bot browser: how it works, configuration, troubleshooting |
+| `test/gateway.test.cjs` | Gateway smoke tests |
+| `test/browser-setup.test.cjs` | Pure-function tests for the installer, shim and routing rules |
 
 ---
 

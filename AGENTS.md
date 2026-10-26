@@ -41,7 +41,13 @@ into the served HTML.
 | `pwa/offline.html` | Offline fallback page. |
 | `pwa/icons/` | SVG source + rasterized PNGs (192/512 + maskable). |
 | `cordis.patch.yml(.example)` | Bundle patch layer / static-mount example. |
+| `scripts/setup-browser.mjs` | One-shot Bot browser install: Chrome for Testing (+ CN mirror fallback), apt deps (t64-aware), playwright-core, shim, verification, profile patch. Pure helpers are exported for tests. |
+| `scripts/verify-browser.mjs` | Browser doctor. `--persistent <dir>` reproduces ds-bot's exact `launchPersistentContext` call. Reports `ok` (browser works) separately from `primaryOk` (that URL worked). |
+| `scripts/pw-proxy-shim.mjs` | The `playwrightUrl` seam. Wraps `launch` / `launchPersistentContext` to add `--proxy-server` and drop automation flags. `playwright-core` loads **lazily**, so importing it never requires Playwright. |
+| `scripts/xray-split-route.mjs` | Rewrites xray `routing` only: drop the catch-all rule, `IPOnDemand`, `geosite:cn` / `geoip:cn` → direct. Idempotent, backs up, rolls back when `xray -test` fails. |
+| `docs/browser.md` | Bot browser: why the shim exists, proxy resolution, troubleshooting table. |
 | `test/gateway.test.cjs` | Smoke tests (boots gateway behind a mock upstream). |
+| `test/browser-setup.test.cjs` | Pure-function tests: argv, CfT platform/download/mirror, apt renames, patch upsert, proxy precedence, launch-arg merging, xray routing. |
 
 ## Key behaviours — don't break these
 
@@ -93,6 +99,22 @@ into the served HTML.
 14. **Injection quoting**: the HTML-injected inline CSS/JS strings in
     `lib/lan-gate-server.cjs` are JS string literals — keep quote usage consistent
     (historical bug: double quotes inside double quotes broke the injected script).
+15. **Never patch ds-bot for the browser**: it hardcodes
+    `args: ['--disable-dev-shm-usage']` and has no proxy option. The supported seam is
+    `playwrightUrl` — ds-bot only reads `.chromium` off the imported module, so
+    `scripts/pw-proxy-shim.mjs` adds flags there. Do not vendor or fork ds-bot.
+16. **The shim must import without Playwright**: ds-bot imports `playwrightUrl` while
+    mounting the plugin, before any browser exists. Keep `playwright-core` lazy
+    (`loadCore()`), or a missing dependency becomes a plugin-mount failure.
+17. **Proxy config is a file, not just env**: DSH scrubs the child environment, so
+    `browser-proxy.json` next to the shim is what survives a systemd restart. An
+    explicit `off`/`none`/`direct` must win over that file (`--no-proxy` depends on it).
+18. **Chrome binaries need a CN mirror**: `storage.googleapis.com` is unreachable from
+    mainland hosts while the version index often is, so a download must fall back
+    (`cdn.npmmirror.com`, then `registry.npmmirror.com`). Never hardcode one host.
+19. **Verification must separate browser from egress**: `ok` means the browser rendered
+    something; `primaryOk` means the requested URL worked. A flaky rented proxy is not a
+    browser bug, and conflating them sends people debugging the wrong layer.
 
 ## Common tasks
 
@@ -106,6 +128,15 @@ into the served HTML.
   bootstrap) and touch gestures in `pwa/touch-gestures.js`.
 - **Change PWA metadata/icons**: edit `pwa/manifest.json` and `pwa/icons/*`; re-run
   `rsvg-convert` if you change the SVG.
+- **Give the Bots a browser**: `node scripts/setup-browser.mjs --proxy <http-proxy>`.
+  It is idempotent — re-running reuses an existing Chrome / playwright-core and only
+  rewrites the `- id: bot` block (with a timestamped backup). `--dry-run`,
+  `--print-config`, `--verify-only` for inspection.
+- **Diagnose the browser**: `node scripts/setup-browser.mjs --verify-only`, or
+  `node scripts/verify-browser.mjs --chrome <c> --shim <s> --persistent <dir>
+  --egress https://api.ipify.org`. `--persistent` reproduces ds-bot's own call.
+- **Fix proxy routing**: `sudo node scripts/xray-split-route.mjs` (backs up, runs
+  `xray -test`, rolls back on failure). `--dry-run` prints the routing block only.
 
 ## Testing
 

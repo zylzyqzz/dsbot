@@ -1,14 +1,20 @@
 {
   "name": "dsh-mobile-pwa",
-  "version": "0.2.1",
-  "description": "Complete mobile PWA for DeepSeek Harness (DSH): secure remote-access gateway + install-to-homescreen manifest + offline-capable service worker + touch-first gestures + agent-done notifications + dark compact mobile UI. 移动端 PWA 完整方案 for DeepSeek Harness.",
+  "version": "0.3.0",
+  "description": "Complete mobile PWA for DeepSeek Harness (DSH): secure remote-access gateway + install-to-homescreen manifest + offline-capable service worker + touch-first gestures + agent-done notifications + dark compact mobile UI + a real Chrome browser for your Bots (one-command setup). 移动端 PWA 完整方案，含 Bot 浏览器一键安装。",
   "license": "MIT",
   "type": "module",
   "main": "lan-gate.mjs",
+  "bin": {
+    "dsbot-browser": "scripts/setup-browser.mjs",
+    "dsbot-verify-browser": "scripts/verify-browser.mjs",
+    "dsbot-xray-split": "scripts/xray-split-route.mjs"
+  },
   "files": [
     "lan-gate.mjs",
     "lib",
     "pwa",
+    "scripts",
     "cordis.patch.yml",
     "cordis.patch.yml.example",
     "AGENTS.md",
@@ -18,7 +24,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test \"test/*.test.cjs\""
+    "test": "node --test \"test/*.test.cjs\"",
+    "setup:browser": "node scripts/setup-browser.mjs",
+    "verify:browser": "node scripts/verify-browser.mjs",
+    "xray:split": "node scripts/xray-split-route.mjs"
   },
   "keywords": [
     "dsh",
@@ -39,7 +48,15 @@
     "offline",
     "reverse-proxy",
     "gateway",
-    "ai-agent"
+    "ai-agent",
+    "chrome",
+    "chrome-for-testing",
+    "browser-automation",
+    "playwright",
+    "xray",
+    "proxy",
+    "split-routing",
+    "web-agent"
   ],
   "dsh": {
     "bundle": {

@@ -25,6 +25,7 @@
 | 👆 **触屏手势** | 下拉刷新、边缘右滑返回、**捏合缩放字体**（可重置） |
 | 🔔 **任务完成通知** | 真正的 Web Push（RFC 8291 aes128gcm 加密 + RFC 8292 VAPID 鉴权），切到别的 App 也能收到 |
 | 📐 **触屏布局** | 44px 触摸目标、safe-area 适配、全屏弹窗、紧凑排版、代码横向滚动——桌面零影响 |
+| 🌐 **Bot 浏览器** | 一条命令给 Bot 装上真实 Chrome（Chrome for Testing + playwright-core + 代理 shim + profile patch + 自检），截图**直接出现在对话里**，遇到登录/支付/验证码可人机接力。详见 [docs/browser.md](docs/browser.md) |
 | 🔒 **桌面不受影响** | 所有规则都以 `html[data-lan-device="phone"]` 或以排除 `data-lan-device="desktop"` 的 `@media` 为根 |
 | 🎯 **0.2 版 DOM 对齐** | 移动端 CSS 全部改用 DSH 0.2 的 slot 词表（`main.conversation` / `conversation.view` / `conversation.chat.flow` / `conversation.input.model` / `conversation.composer.dock` …），0.1 时代已失效的选择器全部移除 |
 
@@ -117,6 +118,34 @@ DSH 0.2 起，浏览器要拿一个**签名 session cookie** 才能用 Web UI，
 
 ---
 
+## 🌐 Bot 浏览器（真实 Chrome，一条命令）
+
+ds-bot 有 12 个浏览器工具，但**不自带浏览器**，启动参数还是写死的、没有代理配置项。这条命令把缺的部分一次补齐：
+
+```bash
+# 在你的 DSH 服务器上
+node scripts/setup-browser.mjs --proxy http://127.0.0.1:7890
+
+# 装完重启
+sudo systemctl restart dsh-web
+```
+
+它会：下载 Chrome for Testing → 装系统库（Ubuntu 24.04 的 `libasound2t64` 改名已处理）→ 装 playwright-core →
+装代理 shim → **真开一个网页验证** → 把 `- id: bot` 写进 profile patch（先备份）。
+
+装完 Bot 就多出 `browser_open` / `browser_snapshot` / `browser_click` / `browser_screenshot` / `browser_handoff` 等 12 个工具，
+其中 `browser_screenshot` 的截图**直接进对话**，不是一行工具日志。
+
+```bash
+node scripts/setup-browser.mjs --verify-only      # 随时自检
+node scripts/setup-browser.mjs --print-config     # 只打印 YAML
+sudo node scripts/xray-split-route.mjs            # 代理分流：国内直连，其余走代理
+```
+
+为什么需要 shim、代理怎么选、排错表 → **[docs/browser.md](docs/browser.md)**
+
+---
+
 ## 🔔 任务完成通知是怎么判定的
 
 DSH 0.2 在智能体工作期间会渲染 `[data-chat-running]`。注入脚本用 `MutationObserver` 盯着它：
@@ -152,7 +181,13 @@ npm test   # 起 mock 上游，验证 /pwa 资产、HTML 注入、状态上报�
 | `pwa/offline.html` | 离线回退页 |
 | `pwa/icons/` | SVG 源 + 192/512 PNG + maskable 图标 |
 | `cordis.patch.yml` / `.example` | 插件 bundle 挂载层 |
-| `test/gateway.test.cjs` | 冒烟测试 |
+| `scripts/setup-browser.mjs` | Bot 浏览器一键安装：Chrome + 系统库 + playwright-core + shim + 自检 + profile patch |
+| `scripts/verify-browser.mjs` | 浏览器自检（真开一个网页，输出 JSON 报告） |
+| `scripts/pw-proxy-shim.mjs` | Playwright 代理 shim：注入 `--proxy-server` 与去自动化标志，不改 ds-bot 源码 |
+| `scripts/xray-split-route.mjs` | xray 分流修复：国内直连 / 其余走代理，带 `xray -test` 与自动回滚 |
+| `docs/browser.md` | Bot 浏览器原理、配置、排错 |
+| `test/gateway.test.cjs` | 网关冒烟测试 |
+| `test/browser-setup.test.cjs` | 安装器 / shim / 分流规则的纯函数测试 |
 
 ---
 
