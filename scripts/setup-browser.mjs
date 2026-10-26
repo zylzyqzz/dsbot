@@ -587,6 +587,24 @@ async function main() {
     if (!verified) log('  the browser did not complete a page load; see the error above')
   }
 
+  step('ds-bot screenshot patch')
+  // Without this a screenshot kills the whole turn: ds-bot emits an image block
+  // with a bare base64 body, and DSH reads attachment.attachmentId off it.
+  const patchScript = join(here, 'patch-ds-bot-image.mjs')
+  if (dryRun) {
+    log(`  would run: node ${patchScript}`)
+  } else if (!existsSync(patchScript)) {
+    log(`  skipped: ${patchScript} not found`)
+  } else {
+    const patched = spawnSync(process.execPath, [patchScript], { encoding: 'utf8' })
+    const output = `${patched.stdout ?? ''}${patched.stderr ?? ''}`.trim()
+    for (const line of output.split('\n').filter(Boolean)) log(`  ${line}`)
+    if (patched.status !== 0) {
+      log('  the patch did not apply; screenshots will fail until it does')
+      verified = false
+    }
+  }
+
   step('profile patch')
   patchProfile({ profileDir, block, dryRun, noPatch: Boolean(args['no-patch']) })
 

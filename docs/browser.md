@@ -23,7 +23,8 @@ node scripts/setup-browser.mjs --proxy http://127.0.0.1:7890
 | 3. 装 playwright-core | `<prefix>/pw/node_modules/playwright-core` | 缺 npm 会直接提示装 Node |
 | 4. 装代理 shim + 写代理配置 | `<prefix>/pw/pw-proxy-shim.mjs`、`browser-proxy.json` | 无 |
 | 5. 真开一个网页验证 | JSON 报告（标题 / 截图字节数 / 出口 IP） | 退出码 1，报告里带真实错误 |
-| 6. 写 profile patch | `<profile>/cordis.patch.yml` 的 `- id: bot` 块（先备份） | profile 不存在时打印 YAML 让你手动贴 |
+| 6. 打 ds-bot 截图补丁 | `<ds-bot>/src/host/browser/mount.js`、`images.js`（先备份） | 源码不匹配就拒绝改，并报出缺哪个锚点 |
+| 7. 写 profile patch | `<profile>/cordis.patch.yml` 的 `- id: bot` 块（先备份） | profile 不存在时打印 YAML 让你手动贴 |
 
 默认安装根目录：
 
@@ -278,7 +279,7 @@ const [ref] = await attachments.saveImages([{ mediaType: 'image/jpeg', data, nam
 > `additionalProperties` 显式写 `true` 或 `false`，否则整个浏览器插件**挂载失败**（12 个工具全部消失），
 > 比原来的 bug 更严重。
 
-一条命令应用（幂等，自动备份，源码不匹配就拒绝改并报出缺哪个锚点）：
+`scripts/setup-browser.mjs` 会自动调用它，一般不用手动跑。单独用也行（幂等，自动备份，源码不匹配就拒绝改并报出缺哪个锚点）：
 
 ```bash
 node scripts/patch-ds-bot-image.mjs            # 打两处补丁
