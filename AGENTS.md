@@ -162,3 +162,30 @@ npm test
 Runs `node --test test/*.test.cjs`, booting `lib/lan-gate-server.cjs` behind a mock
 DSH upstream (isolated temp `DSH_HOME`) and asserting `/pwa` asset serving, HTML
 injection, PWA status reporting, and the Web Push encryption round-trip.
+
+`test/upstream-coupling.test.cjs` is the guard that matters most over time: it
+fails the build when an upstream-private class name reappears in the shell.
+
+### Probing a running DSH
+
+`scripts/check-upstream-contract.mjs` checks the two contracts the shell depends
+on against a live DSH: the client modules that must be mounted, the slots
+`pwa/app.css` selects, and every typed-RPC call the shell makes.
+
+```bash
+# against DSH directly
+node scripts/check-upstream-contract.mjs --origin http://127.0.0.1:3080 \
+  --host 111.170.171.25:3088 --token <launch token> \
+  --slot-catalog /path/to/upstream/slot-catalog.ts
+
+# against the gateway, the way a phone connects
+node scripts/check-upstream-contract.mjs --origin http://111.170.171.25:3088 \
+  --host 111.170.171.25:3088 --password <access password> \
+  --slot-catalog /path/to/upstream/slot-catalog.ts
+```
+
+The slot names are not published at runtime — the runtime only lists the client
+*modules* — so `--slot-catalog` points at the upstream file that enumerates them
+(`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts`). Run this
+after every upstream upgrade: it turns a renamed slot or a changed RPC shape
+into a failing script instead of a silently broken phone layout.
