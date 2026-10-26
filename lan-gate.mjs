@@ -167,16 +167,23 @@ export function apply(ctx) {
         (token ? ' · dsh session bootstrap armed' : ' · dsh session bootstrap unavailable')
       )
 
+      // The gateway child tags its own lines, so forwarding them verbatim
+      // would print the prefix twice.
+      const forward = (text) => String(text).trim().split('\n')
+        .filter((line) => line.length > 0)
+        .map((line) => (line.startsWith('[dsbot]') ? line : `[dsbot] ${line}`))
+        .join('\n')
+
       const report = () => {
         const out = handle && handle.collected && handle.collected.stdout
         if (out) {
           const read = out.readFrom(0)
-          if (read && read.text) console.log(`[dsbot] ${read.text.trim()}`)
+          if (read && read.text) console.log(forward(read.text))
         }
         const err = handle && handle.collected && handle.collected.stderr
         if (err) {
           const eread = err.readFrom(0)
-          if (eread && eread.text) console.error(`[dsbot] stderr: ${eread.text.trim()}`)
+          if (eread && eread.text) console.error(forward(eread.text))
         }
       }
       reportTimer = setTimeout(report, 1500)
