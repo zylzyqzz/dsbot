@@ -257,18 +257,35 @@ test('applySplitRouting fixes a stock catch-all config', async () => {
   assert.strictEqual(changed, true)
   assert.strictEqual(config.routing.domainStrategy, 'IPOnDemand')
   assert.ok(notes.some((n) => /catch-all/.test(n)))
-  assert.ok(config.outbounds.some((o) => o.tag === 'block' && o.protocol === 'blackhole'))
+  assert.ok(!config.outbounds.some((o) => o.tag === 'block'), 'no unreferenced block outbound')
 
   const rules = config.routing.rules
-  assert.deepStrictEqual(rules[0].ip, ['geoip:private'])
-  assert.deepStrictEqual(rules[1].domain, ['geosite:cn'])
-  assert.deepStrictEqual(rules[2].ip, ['geoip:cn'])
+  assert.deepStrictEqual(rules[0].domain, ['geosite:cn'])
+  assert.deepStrictEqual(rules[1].ip, ['geoip:cn', 'geoip:private'])
   assert.ok(rules.every((r) => !(r.outboundTag === 'proxy' && !r.network)), 'no catch-all may survive')
   assert.ok(rules.some((r) => r.outboundTag === 'proxy'), 'something must still reach the proxy')
 
   // The input object is not mutated.
   assert.strictEqual(stock.routing.rules.length, 1)
   assert.strictEqual(stock.routing.domainStrategy, 'IPIfNonMatch')
+})
+
+test('applySplitRouting adds a block outbound only when a rule uses it', async () => {
+  const { applySplitRouting } = await load('xray-split-route.mjs')
+  const config = {
+    outbounds: [{ tag: 'proxy', protocol: 'vless', settings: {} }],
+    routing: {
+      rules: [
+        { type: 'field', domain: ['geosite:category-ads-all'], outboundTag: 'block' },
+        { type: 'field', network: 'tcp,udp', outboundTag: 'proxy' },
+      ],
+    },
+  }
+  const { config: next, notes } = applySplitRouting(config)
+  assert.ok(notes.some((n) => /block/.test(n)))
+  assert.ok(next.outbounds.some((o) => o.tag === 'block' && o.protocol === 'blackhole'))
+  assert.ok(next.outbounds.some((o) => o.tag === 'direct' && o.protocol === 'freedom'))
+  assert.ok(next.routing.rules.some((r) => r.outboundTag === 'block'), 'the ad rule survives')
 })
 
 test('applySplitRouting is idempotent and keeps user rules', async () => {
@@ -278,16 +295,15 @@ test('applySplitRouting is idempotent and keeps user rules', async () => {
     { tag: 'direct', protocol: 'freedom', settings: {} },
     { tag: 'block', protocol: 'blackhole', settings: {} },
   ]
-  // Already in canonical order: our three rules first, then the user's own.
+  // Already correct, in the shape a hand-tuned config usually has: the values
+  // are grouped differently from what this script would emit, and that is fine.
   const canonical = {
     outbounds,
     routing: {
       domainStrategy: 'IPOnDemand',
       rules: [
-        { type: 'field', ip: ['geoip:private'], outboundTag: 'direct' },
-        { type: 'field', domain: ['geosite:cn'], outboundTag: 'direct' },
-        { type: 'field', ip: ['geoip:cn'], outboundTag: 'direct' },
-        { type: 'field', domain: ['domain:corp.example'], outboundTag: 'direct' },
+        { type: 'field', outboundTag: 'direct', domain: ['geosite:cn', 'geosite:private'] },
+        { type: 'field', outboundTag: 'direct', ip: ['geoip:cn', 'geoip:private'] },
         { type: 'field', network: 'tcp,udp', outboundTag: 'proxy' },
       ],
     },

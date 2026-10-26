@@ -45,10 +45,15 @@ const MATCHER_KEYS = ['domain', 'ip', 'port', 'source', 'user', 'inboundTag', 'p
 /** The rules this script owns, in evaluation order. */
 export function splitRules(directTag = 'direct') {
   return [
-    { type: 'field', ip: ['geoip:private'], outboundTag: directTag },
     { type: 'field', domain: ['geosite:cn'], outboundTag: directTag },
-    { type: 'field', ip: ['geoip:cn'], outboundTag: directTag },
+    { type: 'field', ip: ['geoip:cn', 'geoip:private'], outboundTag: directTag },
   ]
+}
+
+/** Does this rule already match every value on that matcher? */
+export function covers(rule, matcher, values) {
+  const list = Array.isArray(rule?.[matcher]) ? rule[matcher] : []
+  return values.every((value) => list.includes(value))
 }
 
 /** A rule that matches everything and therefore shadows every later rule. */
@@ -85,15 +90,19 @@ export function applySplitRouting(config, options = {}) {
     outbounds.push({ tag: directTag, protocol: 'freedom', settings: {} })
     notes.push(`added outbound "${directTag}" (freedom)`)
   }
-  if (!outbounds.some((entry) => entry?.tag === blockTag)) {
-    outbounds.push({ tag: blockTag, protocol: 'blackhole', settings: {} })
-    notes.push(`added outbound "${blockTag}" (blackhole)`)
-  }
   next.outbounds = outbounds
 
   const fallbackTag = options.proxyTag ?? proxyTag(outbounds)
   const routing = next.routing && typeof next.routing === 'object' ? next.routing : {}
   const rules = Array.isArray(routing.rules) ? routing.rules : []
+
+  // Only add `block` when a rule actually routes to it: an unreferenced
+  // outbound is noise in a config the user reads by hand.
+  const referencesBlock = rules.some((rule) => rule?.outboundTag === blockTag)
+  if (referencesBlock && !outbounds.some((entry) => entry?.tag === blockTag)) {
+    outbounds.push({ tag: blockTag, protocol: 'blackhole', settings: {} })
+    notes.push(`added outbound "${blockTag}" (blackhole)`)
+  }
 
   const kept = []
   for (const rule of rules) {
@@ -104,14 +113,24 @@ export function applySplitRouting(config, options = {}) {
     kept.push(rule)
   }
 
-  // Drop any previous copy of our own rules so re-running is idempotent.
-  const ours = splitRules(directTag)
-  const oursKey = (rule) => `${(rule.domain ?? rule.ip ?? []).join(',')}`
-  const ourKeys = new Set(ours.map(oursKey))
-  const filtered = kept.filter((rule) => !ourKeys.has(oursKey(rule)))
+  // Add only what is genuinely missing. An existing direct rule that already
+  // lists `geosite:cn` (or `geoip:cn` / `geoip:private`) is left exactly as the
+  // user wrote it — a hand-tuned config must not be reordered just because this
+  // script would have grouped the same values differently.
+  const directRules = rules.filter((rule) => rule?.outboundTag === directTag)
+  const missingDomain = !directRules.some((rule) => covers(rule, 'domain', ['geosite:cn']))
+  const missingCnIp = !directRules.some((rule) => covers(rule, 'ip', ['geoip:cn']))
+  const missingPrivate = !directRules.some((rule) => covers(rule, 'ip', ['geoip:private']))
+
+  const additions = []
+  if (missingDomain) additions.push(splitRules(directTag)[0])
+  if (missingCnIp || missingPrivate) {
+    const ip = [...(missingCnIp ? ['geoip:cn'] : []), ...(missingPrivate ? ['geoip:private'] : [])]
+    additions.push({ type: 'field', ip, outboundTag: directTag })
+  }
 
   routing.domainStrategy = 'IPOnDemand'
-  routing.rules = [...ours, ...filtered]
+  routing.rules = [...additions, ...kept]
 
   // If nothing routes to the proxy any more, restore one explicit final rule so
   // the config still behaves like a proxy instead of silently going direct.
