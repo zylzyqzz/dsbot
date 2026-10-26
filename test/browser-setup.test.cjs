@@ -232,6 +232,113 @@ test('pickHighestVersion sorts numerically, not lexically', async () => {
   assert.strictEqual(pickHighestVersion(undefined), '')
 })
 
+test('applyImagePatch turns the base64 screenshot into an attachment block', async () => {
+  const { applyImagePatch, MARKER } = await load('patch-ds-bot-image.mjs')
+  // The three anchors as they appear in ds-bot's mount.js.
+  const original = [
+    'export const browserOutput = {',
+    '  schema: {',
+    '    oneOf: [',
+    '      { type: \'string\' },',
+    '      {',
+    '        type: \'object\',',
+    '        properties: {',
+    '          text: { type: \'string\', required: true },',
+    '          image: { type: \'string\' },',
+    '        },',
+    '        additionalProperties: false,',
+    '      },',
+    '    ],',
+    '  },',
+    '  render(_args, value) {',
+    '    if (value && typeof value === \'object\') {',
+    '      const blocks = [{ type: \'text\', text: String(value.text ?? \'\') }]',
+    '      if (value.image) blocks.push({ type: \'image\', data: value.image, mediaType: \'image/jpeg\' })',
+    '      return blocks',
+    '    }',
+    '  },',
+    '}',
+    '',
+    '/**',
+    ' * @param {any} ctx',
+    ' * @param {{ toolDefs: any[], defineTool: Function }} options',
+    ' */',
+    'export function mountBrowserPlugin(ctx, options) {',
+    '      async execute(args, exec) {',
+    '        const gate = authorize ? action => authorize(exec, botId, action) : undefined',
+    '        return gateScope.run(gate, () => spec.execute(args ?? {}, {',
+    '          botId,',
+    '          profileDir: join(profileRoot, botId),',
+    '          session,',
+    '          complete: completeFor?.(exec),',
+    '        }))',
+    '      },',
+    '}',
+  ].join('\n')
+
+  const result = applyImagePatch(original)
+  assert.strictEqual(result.changed, true)
+  assert.deepStrictEqual(result.missing, [])
+  assert.strictEqual(result.applied.length, 4)
+
+  assert.match(result.source, new RegExp(MARKER), 'marker is present so a re-run is a no-op')
+  assert.match(result.source, /attachment: \{ type: 'object', additionalProperties: true \}/, 'schema allows the ref, explicitly closed')
+  assert.match(result.source, /if \(value\.attachment\) blocks\.push\(\{ type: 'image', attachment: value\.attachment \}\)/)
+  assert.ok(!result.source.includes("type: 'image', data: value.image"), 'the crashing shape is gone')
+  assert.match(result.source, /await attachments\.saveImages\(\[\{/)
+  assert.match(result.source, /const result = await gateScope\.run/)
+  assert.match(result.source, /return withScreenshotAttachment\(result, ctx\)/)
+
+  // Idempotent: the marker short-circuits a second run.
+  const again = applyImagePatch(result.source)
+  assert.strictEqual(again.patched, true)
+  assert.strictEqual(again.changed, false)
+  assert.strictEqual(again.source, result.source)
+})
+
+test('applyImagePatch refuses to guess when ds-bot has drifted', async () => {
+  const { applyImagePatch } = await load('patch-ds-bot-image.mjs')
+  const result = applyImagePatch('// some other version\nexport const x = 1\n')
+  assert.strictEqual(result.changed, false)
+  assert.strictEqual(result.missing.length, 4)
+  assert.strictEqual(result.source, '// some other version\nexport const x = 1\n', 'nothing is rewritten')
+})
+
+test('applyHistoryGuardPatch stops stale image blocks from breaking a session', async () => {
+  const { applyHistoryGuardPatch, HISTORY_MARKER } = await load('patch-ds-bot-image.mjs')
+  const original = [
+    '    for (const message of messages) {',
+    '      if (!liveImages(message)) continue',
+    '      for (const block of message.content) {',
+    "        if (block?.type === 'image' && !block.offloaded) images.set(String(block.attachment.attachmentId), block.attachment)",
+    '      }',
+    '    }',
+    '    return messages.map(message => (liveImages(message)',
+    '      ? {',
+    '          ...message,',
+    "          content: message.content.map(block => (block?.type === 'image' && !block.offloaded",
+    "            ? imageAsText(block.attachment, readings.get(String(block.attachment.attachmentId)))",
+    '            : block)),',
+    '        }',
+    '      : message))',
+  ].join('\n')
+
+  const result = applyHistoryGuardPatch(original)
+  assert.strictEqual(result.changed, true)
+  assert.deepStrictEqual(result.missing, [])
+  assert.match(result.source, new RegExp(HISTORY_MARKER))
+  assert.match(result.source, /block\?\.type === 'image' && block\.attachment && !block\.offloaded\) images\.set/)
+  assert.match(result.source, /content: message\.content\.map\(block => \(block\?\.type === 'image' && block\.attachment && !block\.offloaded/)
+  // Every occurrence of the old unguarded condition must be gone; both call
+  // sites now require an attachment before touching it.
+  assert.ok(
+    !result.source.includes("type === 'image' && !block.offloaded"),
+    'no unguarded `type === image && !offloaded` condition survives',
+  )
+
+  assert.strictEqual(applyHistoryGuardPatch(result.source).patched, true)
+})
+
 test('isCatchAll spots the rule that swallows every other rule', async () => {
   const { isCatchAll } = await load('xray-split-route.mjs')
   assert.strictEqual(isCatchAll({ type: 'field', outboundTag: 'proxy' }), true)

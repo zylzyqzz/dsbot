@@ -234,6 +234,72 @@ node scripts/verify-browser.mjs \
 
 ---
 
+## 截图为什么必须走 attachments
+
+装上浏览器后第一次让 Bot 截图，很容易遇到这个报错：
+
+```
+This turn failed: Cannot read properties of undefined (reading 'attachmentId')
+```
+
+原因不在浏览器，而在**消息形状**。ds-bot 的 `browserOutput.render` 把截图塞成：
+
+```js
+{ type: 'image', data: '<base64>', mediaType: 'image/jpeg' }
+```
+
+但 DSH 只渲染**带 attachment 引用**的图片块，它的图片管线无条件读
+`block.attachment.attachmentId`（`ds-bot/src/host/images.js`）。裸 `data` 字段一路撞到这个读取，
+整个 turn 直接失败，截图永远到不了用户面前。
+
+正解是让截图走 DSH 自己的 attachments 服务：
+
+```js
+const [ref] = await attachments.saveImages([{ mediaType: 'image/jpeg', data, name: 'Browser screenshot' }])
+// render 输出 { type: 'image', attachment: ref }
+```
+
+这是同一个形状 DSH 用来显示用户粘贴的图片的形状。
+
+### 还有个更阴的坑：坏消息会永久污染会话
+
+那一轮崩溃时，**坏掉的图片块已经写进会话历史了**。之后这个会话的每一轮都会在构建上下文时
+重新读到 `block.attachment.attachmentId`，于是永远报同一个错 —— 看起来像"插件缓存的会话是坏的"，
+重启服务也没用。
+
+所以补丁要打两处：
+
+| 文件 | 改动 |
+| --- | --- |
+| `src/host/browser/mount.js` | 截图先存进 attachments，`render` 输出 `{type:'image', attachment}`；schema 显式声明 `attachment` |
+| `src/host/images.js` | 读到没有 `attachment` 的图片块时**跳过**而不是抛错，让历史里的坏数据不再拖垮会话 |
+
+> schema 里 `attachment: { type: 'object' }` 是不够的：DSH 的 JSON Schema 编译器要求
+> `additionalProperties` 显式写 `true` 或 `false`，否则整个浏览器插件**挂载失败**（12 个工具全部消失），
+> 比原来的 bug 更严重。
+
+一条命令应用（幂等，自动备份，源码不匹配就拒绝改并报出缺哪个锚点）：
+
+```bash
+node scripts/patch-ds-bot-image.mjs            # 打两处补丁
+node scripts/patch-ds-bot-image.mjs --dry-run   # 只看会改什么
+node scripts/patch-ds-bot-image.mjs --revert    # 还原备份
+sudo systemctl restart dsh-web
+```
+
+`--path <ds-bot 目录>` 用于非默认安装位置。
+
+### 中文显示成方框
+
+无头 Chrome 所在的服务器如果没装中文字体，截图里汉字会全部变成 □。装一次即可：
+
+```bash
+sudo apt-get install -y fonts-noto-cjk fonts-wqy-zenhei
+fc-cache -f
+```
+
+---
+
 ## 安全
 
 - **代理凭据不入库**：`browser-proxy.json` 只写在本机，仓库里只有 `.example` 形状的说明。
